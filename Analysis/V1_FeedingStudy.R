@@ -11,25 +11,31 @@
 # During the Experiment four Individual of L. terrestris died in Microcosms with the interaction Treatment in the 15N experimental part / approach.
 
 ## Survival Rates: ####
-Lt.Exp1  = 100*(1-4/(4*2*2*2)) # = 87.5 %
-Lt.Exp2  = 100*(1-0/(3*2*2*2)) # = 100 %
-Lt.total = 100*(1-4/((4*2*2*2)+(3*2*2*2))) # = 92.86 %
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # 100*(1-dead worms/all worms)
+Exp1  = 100*(1-4/(4*2*2*2)) # = 87.5 %
+Exp2  = 100*(1-0/(3*2*2*2)) # = 100 %
+Total = 100*(1-4/((4*2*2*2)+(3*2*2*2))) # = 92.86 %
+Lt.SurvivalRates <- rbind(Exp1,Exp2,Total)
+colnames(Lt.SurvivalRates)[1] <- "%"
+rm(Exp1,Exp2,Total)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# Data Exploration
-str(ew.bm)
+
+# Data Exploration ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 # Ranges
 with(ew.bm, list(length(before), range(before),range(after)))
-bs.worms1 = binsize1 = diff(range(ew.bm$before))/26
-bs.worms2 = binsize2 = diff(range(ew.bm$after))/26
-bs.worms3 = binsize3 = diff(range(ew.bm$diff))/length(ew.bm$diff)
-
+# create binsizes for Histograms
+binsize1 = diff(range(ew.bm$before))/26
+binsize2 = diff(range(ew.bm$after))/26
+binsize3 = diff(range(ew.bm$diff))/length(ew.bm$diff)
 
 # Histograms Before/After
 ew.bm.melt = melt(ew.bm[,-c(7,8)], id.vars=c(1:4))
 ew.bm.p1 <- ggplot(ew.bm.melt, aes(x=value)) + 
-  geom_histogram( binwidth = bs.worms1, fill="lightblue3", colour="black") + 
+  geom_histogram( binwidth = binsize1, fill="lightblue3", colour="black") + 
   geom_line(stat="density") +
   xlim(6.5,11) + 
   xlab("Biomass [g]") +
@@ -37,9 +43,9 @@ ew.bm.p1 <- ggplot(ew.bm.melt, aes(x=value)) +
   ggtitle("Histograms EW-biomass \n Before/After") +
   facet_grid(variable ~ .) + mytheme
 
-# normally distributed diferences?
+# Histogram of differences
 ew.bm.p2 <- ggplot(ew.bm, aes(x=diff)) +
-  geom_histogram(binwidth = bs.worms3, fill="lightblue3", colour="black") + 
+  geom_histogram(binwidth = binsize3, fill="lightblue3", colour="black") + 
   geom_line(stat="density") + 
   xlab("differences [g]") + 
   ylab("Frequency") + 
@@ -50,7 +56,11 @@ grid.newpage()
 pushViewport(viewport(layout = grid.layout(1, 2)))
 print(ew.bm.p1, vp = vplayout(1, 1))
 print(ew.bm.p2, vp = vplayout(1, 2))
-```
+
+rm(ew.bm.melt, binsize1, binsize2, binsize3)
+
+
+
 ### Analysis
 ``` {r Analysis1, echo=FALSE, fig.width=8, fig.height=7}
 shapiro.test(ew.bm$diff) # kann bei diesem Test eine Signifikanz (p < 0.05) festgestellt werden, so liegt keine Normalverteilung vor.
