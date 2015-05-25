@@ -1551,6 +1551,7 @@ p4 = ggplot(data=gas15.fig4, aes(x=nitox.gc.mean, y=nitox.pool.mean)) +
 p4 + mytheme +theme(legend.position=c(0.08,0.75) )
 ```
 
+
 All Incubation measures [AIM]
 Data frame with litter derived -N2, -N2O, -N2+N2O, -N2O + soil derived N2O, N2 + total N2O, percentage, product ratio N2/litter N2O, N2/total N2O
 

@@ -6,8 +6,10 @@
 ###########################
 
 
-# 1. Eathworm Biomass
-# arthworm biomass was measured in g after earthworm guts were voided. Mesurements took place before and after the experiment.
+# 1. Eathworm Biomass ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# earthworm biomass was measured in g after earthworm guts were voided. Mesurements took place before and after the experiment.
 # During the Experiment four Individual of L. terrestris died in Microcosms with the interaction Treatment in the 15N experimental part / approach.
 
 ## Survival Rates: ####
@@ -61,68 +63,38 @@ rm(ew.bm.melt, binsize1, binsize2, binsize3)
 
 
 
-### Analysis
-``` {r Analysis1, echo=FALSE, fig.width=8, fig.height=7}
+# Analysis ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 shapiro.test(ew.bm$diff) # kann bei diesem Test eine Signifikanz (p < 0.05) festgestellt werden, so liegt keine Normalverteilung vor.
 
-
-#ggplot with qqnorm and qqline
-vec <- ew.bm$diff
-y <- quantile(vec[!is.na(vec)], c(0.25, 0.75))
-x <- qnorm(c(0.25, 0.75))
-slope <- diff(y)/diff(x)
-int <- y[1L] - slope * x[1L]
-d <- data.frame(resids = vec)
-
-ew.bm.p3 <- ggplot(d, aes(sample = resids)) + 
-  stat_qq() + 
-  geom_abline(slope = slope, intercept = int, col="red") + 
-  mytheme
-# Bland Altman plot
-ew.bm$diff.mean <- (ew.bm$after+ew.bm$before)/2
-df2 <- ddply(ew.bm,.(rep("a", length(diff))),summarise,mean=mean(diff, na.rm = TRUE),
-             sd=sd(diff, na.rm = TRUE))
-ew.bm.p4 <- ggplot(ew.bm, aes(diff.mean, diff)) + 
-  geom_point(na.rm=TRUE) + 
-  geom_hline(data=df2,aes(yintercept=c(round(mean,3),
-                                       round(mean+2*sd,3),
-                                       round(mean-2*sd,3))),
-             linetype=c(1,2,2), color='blue') +
-  mytheme
-
-grid.newpage()
-pushViewport(viewport(layout = grid.layout(1, 2)))
-print(ew.bm.p3, vp = vplayout(1, 1))
-print(ew.bm.p4, vp = vplayout(1, 2))
+qqnorm(ew.bm$diff)
+qqline(ew.bm$diff)
 
 
-# ew.bm.meth <- Meth(ew.bm[,c(5,6)], y=c("after","before")) # it was necessary, that no other variables from ew.bm are in the Meth object!!!
-# BA.plot(ew.bm.meth, axlim=c(8,10), diflim=c(-3,1))
-
-# t.test
-# with(ewfw, t.test(diff))
-# with(ew.bm, t.test(before, after, paired=T, alternative="greater"))
+# t.test ####
 with(ew.bm, t.test(after, before, paired=T, alternative="less")) 
-# Defining alt="less", means check whether the mean of the values contained in the vector a is less of the mean of the values contained in the vector b (t.test(a,b,paired=TRUE, alt="less"))
+# Defining alt="less", means check whether the mean of the values contained in the vector a is less 
+# of the mean of the values contained in the vector b 
 
-
+# ANOVA ####
 # Were Changes in L. terrestris Biomass affected by Treatments?
 summary(aov(diff ~ treat*soil*exp, data=ew.bm))
 # NO it was not.
 
-list(mean(ew.bm$before),
-     se(ew.bm$before),
-     mean(ew.bm$after),
-     se(ew.bm$after))
-```
+list(mean=apply(ew.bm[,5:6],2,mean),
+     SE=apply(ew.bm[,5:6],2,se))
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
-#2. Collembolan Population growth
-Collembolans grew very well during the experiment and reached densities hardly observed in agricultural systems.
+## 2. Collembolan Population growth ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-##### Growth Factor
-```{r Collembolan population}
+# Collembolans grew very well during the experiment and 
+# reached densities hardly observed in agricultural systems.
+
+# Growth Factor ####
 col.pop.initial = 238 #Ind/MC
 col.pop.growth = col.pop$surface/238
 col.pop$growth_f = col.pop.growth
@@ -131,58 +103,59 @@ range(col.pop.growth)
 mean(col.pop.growth); se(col.pop.growth)
 ```
 
-
-```{r, Boxplots, fig.width=7, fig.height=6, echo=FALSE}
 # Boxplot Graphical Data Exploration
 col.pop$exp <- revalue(col.pop$exp, c(Exp1="Experiment~1",Exp2="Experiment~2"))
 col.pop$treat <- revalue(col.pop$treat, c(C ="F.~candida",RC="Interaction"))
 
 ggplot(col.pop, aes(x= treat, y=surface),labeller=label_parsed) +
   stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
-  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  geom_boxplot(fill="light blue",lwd=0.2, outlier.size=0.4, outlier.shape=21) +
   ylab(expression(paste("Collembolan density [Ind ",MC[surface]^-1,"]"))) +
   xlab("Treatment") +
   ggtitle(expression(paste("Boxplots for collembolan density per ",MC[surface]))) +
   facet_grid(exp~soil, labeller=label_parsed) + 
   scale_x_discrete("Treatment", labels=expression(italic(F.~candida), Interaction)) +
   mytheme
-````
 
-In 3 out of 4 cases Presence of Lumbricus terrestris led to increased Collembolan population growth. The only exception is the loamy soil treatment in Exp1. Here the opposite was observed.
-Furthermore loamy soil treatments increased collembolan population growth in both experiments compared to sandy soil (`r tapply(col.pop$surface, col.pop$soil,mean)`, Loam, Sand).
-Hypothesis: Low Nitrogen content of food material leads to decreased collembolan populations in loamy soil if L. terrestris is present.
+
+# In 3 out of 4 cases Presence of Lumbricus terrestris led to increased Collembolan population growth. The only exception is the loamy soil treatment in Exp1. Here the opposite was observed.
+# Furthermore loamy soil treatments increased collembolan population growth in both experiments compared to sandy soil (`r tapply(col.pop$surface, col.pop$soil,mean)`, Loam, Sand).
+# Hypothesis: Low Nitrogen content of food material leads to decreased collembolan populations in loamy soil if L. terrestris is present.
 
 ### Analysis of Collembolan populations
-```{r Analysis2}
 # Table of means
 with(col.pop, tapply(surface, list(soil, treat, exp), mean))
 
 # Analysis of variance
 cp.lm1 <- lm(surface ~ treat*soil*exp, data=col.pop);cp.lm1; summary.aov(cp.lm1);summary.lm(cp.lm1)
 cp.lm2 <- lm(surface ~ treat*soil*exp-exp:treat:soil, data=col.pop);cp.lm2; summary.aov(cp.lm2);summary.lm(cp.lm2)
-# Soil and Experiment are significant in the main effects
-# Treatments is significant in interaction with soil and with experiment
 
-# The coefficients table of summary.lm has as many rows, as there are parameters in the model.The Intercept is the only mean value in the table. The second column contains the unreliability estimates. The firs ROW contains the standard error of a MEAN. The Other four rows contain the standard errors of  the DIFFERENCE between two means. The p-values are misleading, suggesting, wrongly, that there are four significant contrasts for this model.
-# All significant differences are differences to Exp1-Loam-F.candida
+# The coefficients table of summary.lm has as many rows, as there are parameters in the model.
+# The Intercept is the only mean value in the table. The second column contains the unreliability estimates. 
+# The first row contains the standard error of a MEAN. 
+# The Other four rows contain the standard errors of  the DIFFERENCE between two means.
+# The p-values are misleading, suggesting, wrongly, that there are four significant contrasts for this model.
+### All significant differences are differences to Exp1-Loam-F.candida
 
 # Effect Sizes of Main Effects
 plot.design(surface ~ soil*exp*treat-exp:treat:soil, data=col.pop)
 
 # The populations were larger in loamy soil
-with(col.pop, tapply(surface, soil, mean))
-with(col.pop, tapply(surface, soil, se))
+with(col.pop, list(mean=tapply(surface, soil, mean),
+                   SE=tapply(surface, soil, se)))
 
 # The populations were larger in Experiment 2
-with(col.pop, tapply(surface, exp, mean))
-with(col.pop, tapply(surface, exp, se))
+with(col.pop, list(mean=tapply(surface, exp, mean),
+                   SE=tapply(surface, exp, se)))
 
-cp.aov <- aov(surface ~ soil*exp*treat, data=col.pop)
 # ANOVA plots
 par(mfrow=c(2,2))
 par(mar=c(3,4,1.5,2), mgp=c(1.5,0.5,0))
-plot(cp.aov)
-# SST plot after Crawley (R-Book, p.)
+plot(cp.lm2)
+
+glht(cp.lm2, linfct = mcp("tukey"))
+
+#SST plot after Crawley (R-Book, p.)
 par(mfrow=c(1,1))
 with(col.pop, { plot(surface, pch=21, col="black",bg="red")
                 abline(mean(surface),0, col="blue")

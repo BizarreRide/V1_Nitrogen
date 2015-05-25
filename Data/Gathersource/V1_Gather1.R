@@ -19,3 +19,5 @@ gas15 <- read.delim("Data/V1_15Ngas.txt")
 isom.data.all <- read.delim("Data/V1_Isotopomere.txt")
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+
