@@ -8,6 +8,8 @@
 
 ### Analysis
 
+source("Data/GatherSource/V1_MakeLikeFile.R")
+
 # The data
 # Nitox.pool and product ratio are AVERAGES, all other cumulated sums
 # omit Loam without L. terrestris
@@ -394,8 +396,8 @@ plot(nxt.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
 axis(1, at=int.SLt,labels=FALSE)
 text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
 
-with(gas15.cum, list( tapply(nitox.soil, list(soil,Lt), mean),
-                      tapply(nitox.soil, list(soil,Lt), se)))
+with(gas15.cum, list( tapply(nitox.soil, list(treat,soil), mean),
+                      tapply(nitox.soil, list(treat,soil), se)))
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

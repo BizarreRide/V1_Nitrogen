@@ -11,6 +11,7 @@
 txt.pool = expression(paste("Plant derived ", N[2],"O"," [%]"))
 txt.nitox = expression(paste(N[2],"O"[litter]," [µg ",N[2],"O-N ",kg^-1, h^-1,"]"))
 txt.nitox.gc = expression(paste(N[2],"O"[total]," [µg ",N[2],"O-N ",kg^-1, h^-1,"]"))
+txt.nitox.soil = expression(paste(N[2],"O"[soil]," [µg ",N[2],"O-N ",kg^-1, h^-1,"]"))
 txt.total      = expression(paste("Total ", N[2],"O+",N[2]," [µg ",N[2],"(O)-N ",kg^-1, h^-1,"]"))
 txt.dinitrogen = expression(paste("Dinitrogen ", N[2]," [µg ",N[2],"-N ",kg^-1, h^-1,"]"))
 txt.ratio      = expression(paste("Product Ratio ", frac(paste(N[2],O),paste(N[2],O+N[2]))))

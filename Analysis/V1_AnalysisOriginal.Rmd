@@ -1,0 +1,2240 @@
+---
+title: "V1 Statistical Analysis"
+author: "Quentin Schorpp"
+date: "Wednesday, September 17, 2014"
+output: html_document
+---
+
+This is the Analysis of a microcosm experiment performed at the Th?nen Institute of Biodiversity, Braunschweig. The Experiment aimed to investigate the influence of soil fauna groups Lumbricidae (*L. terrestris*) and Collembola (*F. candida*) on the microbial activity involved in gaseous nitrogen emissions. The data consists of three different qualities of measurement. First emissions of N[2]O and CO[2] were measured continously during the whole duration of the experiment in intervals lasting several days. That data is in units of ppb or ppm. Second at four dates the microcosms were incubated with artificial atmosphere and 15N isotopic signatures of N2O and N2 were measured. Third at one particular date samples for isotopomere measurements were taken.
+
+#### Set working directory #
+```{r working directory}
+ #setwd("E:/Quentin_Schorpp_20.11.2014/Arbeitsprozess/V1_Analysis")
+ setwd("D:/Quentin Schorpp/Arbeitsprozess/V1_Analysis")
+#setwd(choose.dir())
+```
+#### Load required packages#
+```{r packages, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(reshape2)
+library(grid)
+library(plyr)
+library(MethComp)
+library(agricolae)
+library(foreign)
+library(multcomp)
+library(gridExtra)
+library(extrafont)
+library(effects)
+library(MASS)
+library(splitstackshape)
+library(bbmle)
+````
+  
+  
+#### Additional Functions:
+```{r Additional Functions, echo=FALSE}
+# Function for Bland Altman Plot
+#------------------------------------
+baplot <- function(m1, m2, ...) {
+  # m1 and m2 are the measurements
+  means <- (m1 + m2) / 2
+  diffs <- m1 - m2
+  mdiff <- mean(diffs)
+  sddiff <- sd(diffs)
+  # Compute the figure limits
+  ylimh <- mdiff + 3 * sddiff
+  yliml <- mdiff - 3 * sddiff
+  # Plot data
+  plot(diffs ~ means, xlab = "Average values",
+       ylab = "Differences", ylim = c(yliml, ylimh), ...)
+  abline(h = mdiff) # Center line
+  # Standard deviations lines
+  abline(h = mdiff + 1.96 * sddiff, lty = 2)
+  abline(h = mdiff - 1.96 * sddiff, lty = 2)
+}
+
+# Function for layout
+#-------------------------------------
+vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+
+# Function for Standard error
+#----------------------------
+se <- function(x) sqrt(var(x)/length(x))
+```
+  
+  
+#### ggplot2 - Theme
+```{r mytheme, echo=FALSE}
+mytheme = 
+  theme_bw() + 
+  theme(strip.background = element_rect(color = "grey", fill="black", size=0.1),
+        strip.text.x = element_text(size=8,  colour="white", face="italic"),
+        strip.text.y = element_text(size=8,  colour="white", face="italic"),
+        axis.text.x = element_text(size=7),
+        axis.title.x = element_text(size=8,face="bold", family="Times New Roman"),
+        axis.text.y = element_text(size=7),
+        axis.title.y = element_text(size=8, family="Times New Roman"),
+        axis.line = element_line(size=0.25),
+        axis.ticks = element_line(size=0.25),
+        plot.title = element_text(size=11,face="bold", family="Times New Roman"),
+        panel.margin = unit(0, "lines"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="black", size=0.2, fill=NA),
+        legend.key=element_blank(),
+        legend.background=element_blank(),
+        legend.text=element_text(size=8,face="italic", family="Times New Roman"),
+        legend.title=element_text(size=8))
+```
+
+#### Load data
+```{r Load data}
+ew.bm <- read.delim("V1_worms_biomass.txt")
+col.pop <- read.delim("V1_col_population.txt")
+ew.iso <- read.delim("V1_worms_isotopes.txt")
+col.iso <- read.delim("V1_col_isotopes.txt")
+n2o.ppb <- read.delim("V1_N2Oppb.txt")
+co2.ppm <- read.delim("V1_CO2ppm.txt")
+gasflow <- read.delim("V1_Gasflow.txt")
+fig2 <- read.delim("V1_Fig_2_data.txt")
+gas15 <- read.delim("V1_15Ngas.txt")
+isom.data.all <- read.delim("V1_Isotopomere.txt")
+```
+  
+  
+  
+# 1. Eathworm Biomass
+Earthworm biomass was measured in g after earthworm guts were voided. Mesurements took place before and after the experiment.
+During the Experiment four Individual of L. terrestris died in Microcosms with the interaction Treatment in the 15N experimental part / approach.
+
+### Survival Rates:
+```{r Ew Survival rates}
+Lt.Exp1  = 100*(1-4/(4*2*2*2)) # = 87.5 %
+Lt.Exp2  = 100*(1-0/(3*2*2*2)) # = 100 %
+Lt.total = 100*(1-4/((4*2*2*2)+(3*2*2*2))) # = 92.86 %
+# 100*(1-dead worms/all worms)
+```
+
+### Data distribution
+```{r Ew-biomass, echo=FALSE}
+# Data Exploration
+str(ew.bm)
+
+# Ranges
+with(ew.bm, list(length(before), range(before),range(after)))
+bs.worms1 = binsize1 = diff(range(ew.bm$before))/26
+bs.worms2 = binsize2 = diff(range(ew.bm$after))/26
+bs.worms3 = binsize3 = diff(range(ew.bm$diff))/length(ew.bm$diff)
+
+
+# Histograms Before/After
+ew.bm.melt = melt(ew.bm[,-c(7,8)], id.vars=c(1:4))
+ew.bm.p1 <- ggplot(ew.bm.melt, aes(x=value)) + 
+  geom_histogram( binwidth = bs.worms1, fill="lightblue3", colour="black") + 
+  geom_line(stat="density") +
+  xlim(6.5,11) + 
+  xlab("Biomass [g]") +
+  ylab("Frequency") +
+  ggtitle("Histograms EW-biomass \n Before/After") +
+  facet_grid(variable ~ .) + mytheme
+
+# normally distributed diferences?
+ew.bm.p2 <- ggplot(ew.bm, aes(x=diff)) +
+  geom_histogram(binwidth = bs.worms3, fill="lightblue3", colour="black") + 
+  geom_line(stat="density") + 
+  xlab("differences [g]") + 
+  ylab("Frequency") + 
+  ggtitle("Histogram of differences") + mytheme
+
+# One figure in row 1 and two figures in row 2
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ew.bm.p1, vp = vplayout(1, 1))
+print(ew.bm.p2, vp = vplayout(1, 2))
+```
+### Analysis
+``` {r Analysis1, echo=FALSE, fig.width=8, fig.height=7}
+shapiro.test(ew.bm$diff) # kann bei diesem Test eine Signifikanz (p < 0.05) festgestellt werden, so liegt keine Normalverteilung vor.
+
+
+#ggplot with qqnorm and qqline
+vec <- ew.bm$diff
+y <- quantile(vec[!is.na(vec)], c(0.25, 0.75))
+x <- qnorm(c(0.25, 0.75))
+slope <- diff(y)/diff(x)
+int <- y[1L] - slope * x[1L]
+d <- data.frame(resids = vec)
+ 
+ew.bm.p3 <- ggplot(d, aes(sample = resids)) + 
+  stat_qq() + 
+  geom_abline(slope = slope, intercept = int, col="red") + 
+  mytheme
+# Bland Altman plot
+ew.bm$diff.mean <- (ew.bm$after+ew.bm$before)/2
+df2 <- ddply(ew.bm,.(rep("a", length(diff))),summarise,mean=mean(diff, na.rm = TRUE),
+                                             sd=sd(diff, na.rm = TRUE))
+ew.bm.p4 <- ggplot(ew.bm, aes(diff.mean, diff)) + 
+  geom_point(na.rm=TRUE) + 
+  geom_hline(data=df2,aes(yintercept=c(round(mean,3),
+                                       round(mean+2*sd,3),
+                                       round(mean-2*sd,3))),
+                      linetype=c(1,2,2), color='blue') +
+  mytheme
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(1, 2)))
+print(ew.bm.p3, vp = vplayout(1, 1))
+print(ew.bm.p4, vp = vplayout(1, 2))
+
+
+# ew.bm.meth <- Meth(ew.bm[,c(5,6)], y=c("after","before")) # it was necessary, that no other variables from ew.bm are in the Meth object!!!
+# BA.plot(ew.bm.meth, axlim=c(8,10), diflim=c(-3,1))
+
+# t.test
+# with(ewfw, t.test(diff))
+# with(ew.bm, t.test(before, after, paired=T, alternative="greater"))
+with(ew.bm, t.test(after, before, paired=T, alternative="less")) 
+# Defining alt="less", means check whether the mean of the values contained in the vector a is less of the mean of the values contained in the vector b (t.test(a,b,paired=TRUE, alt="less"))
+
+
+# Were Changes in L. terrestris Biomass affected by Treatments?
+summary(aov(diff ~ treat*soil*exp, data=ew.bm))
+# NO it was not.
+
+list(mean(ew.bm$before),
+     se(ew.bm$before),
+     mean(ew.bm$after),
+     se(ew.bm$after))
+```
+  
+  
+  
+#2. Collembolan Population growth
+Collembolans grew very well during the experiment and reached densities hardly observed in agricultural systems.
+  
+##### Growth Factor
+```{r Collembolan population}
+col.pop.initial = 238 #Ind/MC
+col.pop.growth = col.pop$surface/238
+col.pop$growth_f = col.pop.growth
+
+range(col.pop.growth)
+mean(col.pop.growth); se(col.pop.growth)
+```
+
+
+```{r, Boxplots, fig.width=7, fig.height=6, echo=FALSE}
+# Boxplot Graphical Data Exploration
+col.pop$exp <- revalue(col.pop$exp, c(Exp1="Experiment~1",Exp2="Experiment~2"))
+col.pop$treat <- revalue(col.pop$treat, c(C ="F.~candida",RC="Interaction"))
+
+ggplot(col.pop, aes(x= treat, y=surface),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("Collembolan density [Ind ",MC[surface]^-1,"]"))) +
+  xlab("Treatment") +
+  ggtitle(expression(paste("Boxplots for collembolan density per ",MC[surface]))) +
+  facet_grid(exp~soil, labeller=label_parsed) + 
+  scale_x_discrete("Treatment", labels=expression(italic(F.~candida), Interaction)) +
+  mytheme
+````
+  
+In 3 out of 4 cases Presence of Lumbricus terrestris led to increased Collembolan population growth. The only exception is the loamy soil treatment in Exp1. Here the opposite was observed.
+Furthermore loamy soil treatments increased collembolan population growth in both experiments compared to sandy soil (`r tapply(col.pop$surface, col.pop$soil,mean)`, Loam, Sand).
+Hypothesis: Low Nitrogen content of food material leads to decreased collembolan populations in loamy soil if L. terrestris is present.
+
+### Analysis of Collembolan populations
+```{r Analysis2}
+# Table of means
+with(col.pop, tapply(surface, list(soil, treat, exp), mean))
+
+# Analysis of variance
+cp.lm1 <- lm(surface ~ treat*soil*exp, data=col.pop);cp.lm1; summary.aov(cp.lm1);summary.lm(cp.lm1)
+cp.lm2 <- lm(surface ~ treat*soil*exp-exp:treat:soil, data=col.pop);cp.lm2; summary.aov(cp.lm2);summary.lm(cp.lm2)
+# Soil and Experiment are significant in the main effects
+# Treatments is significant in interaction with soil and with experiment
+       
+# The coefficients table of summary.lm has as many rows, as there are parameters in the model.The Intercept is the only mean value in the table. The second column contains the unreliability estimates. The firs ROW contains the standard error of a MEAN. The Other four rows contain the standard errors of  the DIFFERENCE between two means. The p-values are misleading, suggesting, wrongly, that there are four significant contrasts for this model.
+# All significant differences are differences to Exp1-Loam-F.candida
+
+    # Effect Sizes of Main Effects
+    plot.design(surface ~ soil*exp*treat-exp:treat:soil, data=col.pop)
+    
+    # The populations were larger in loamy soil
+    with(col.pop, tapply(surface, soil, mean))
+    with(col.pop, tapply(surface, soil, se))
+    
+    # The populations were larger in Experiment 2
+    with(col.pop, tapply(surface, exp, mean))
+    with(col.pop, tapply(surface, exp, se))
+
+cp.aov <- aov(surface ~ soil*exp*treat, data=col.pop)
+      # ANOVA plots
+      par(mfrow=c(2,2))
+      par(mar=c(3,4,1.5,2), mgp=c(1.5,0.5,0))
+      plot(cp.aov)
+      # SST plot after Crawley (R-Book, p.)
+      par(mfrow=c(1,1))
+      with(col.pop, { plot(surface, pch=21, col="black",bg="red")
+                      abline(mean(surface),0, col="blue")
+                      title("SST")
+                      ylab="response (surface)"
+                      for (i in 1:28)
+                        lines(c(i,i), c(surface[i], mean(surface)), col="green")
+            })
+TukeyHSD(cp.aov)
+# Unterschiede zw. den treatments innerhalb desselben Experiments und derselben soil texture sind ALLE nicht significant!!!  
+  
+                # More Multiple Comparisons:
+                # Variant 1:
+                col.pop.int <- cp.int <- with(col.pop, interaction(exp,soil,treat)) # Triple interaction factor
+                col.aov2 <- aov(surface ~ cp.int, data=col.pop)
+                HSD.test(col.aov2, "cp.int", group=TRUE, console=TRUE)
+                #Variant 2:  
+                col.tuk1 <- glht(col.aov2, linfct = mcp(cp.int = "Tukey"))
+                summary(col.tuk1)          # standard display
+                col.tuk.cld <- cld(col.tuk1)   # letter-based display
+                par(mai=c(1,1,1.1,0.2),
+                    mfrow=c(1,1),
+                    mgp=c(2,1,0),
+                    cex=0.8) # mai specifiec margin size in inches
+                plot(col.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
+                axis(1, at=cp.int,labels=FALSE)
+                text(cp.int, labels=cp.int, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+
+
+    # Effect sizes of interactions
+    col.pop.effects <- allEffects(cp.lm2)
+    plot(col.pop.effects, "treat:soil")
+    plot(col.pop.effects, "treat:exp")
+    plot(col.pop.effects, "soil:exp")
+    
+    model.tables(cp.aov, "means", se=TRUE)
+    with(col.pop, tapply(surface, list(treat,soil), mean))
+    with(col.pop, tapply(surface, list(treat,soil), se))
+    
+    with(col.pop, tapply(surface, list(treat,exp), mean))
+    with(col.pop, tapply(surface, list(treat,exp), se))
+    
+    with(col.pop, tapply(surface, list(soil,exp), mean))
+    with(col.pop, tapply(surface, list(soil,exp), se))
+
+    col.pop.effects <- allEffects(cp.lm1)
+    plot(col.pop.effects, "treat:soil:exp")
+    
+    # Interessieren w?rde mich wie viel gr??er die Populationen im Schnitt in Anwesenheit von L. terrestris waren.
+    # Datensatz zu differenzen zw. Interaktion und Single-Species Treatments
+    # PROBLEM: Welche Mikrokosmen bilden Paare? 
+    # Bilden aller paarweise DIfferenzen und/oder nur f?r selbe Faktoren Kombination aus Exp und soil?
+    # Wie subtrahiert man Standardfehler voneinander (gibt T-Test Aufschl?sse?)
+    
+    # Mein reduzierter Versuch:
+    treat.sand.exp1 = a = 9629 - 6319
+    treat.sand.exp2 = b = 18781 - 14766
+    treat.loam.exp2 = c = 11246 - 4487
+    cp.diff.means = c(a,b,c)
+    mean(cp.diff.means); se(cp.diff.means)
+
+```
+
+### Tukey HSD plots Two Way Interactions (optional)
+```{r More Tukey HSD, echo=FALSE, eval=FALSE}
+cp.int <- with(col.pop, interaction(treat, soil))
+aov.col1 <- aov(surface ~ cp.int, data=col.pop)
+HSD.test(aov.col1, "cp.int", group=TRUE, console=TRUE)
+tuk <- glht(aov.col1, linfct = mcp(cp.int = "Tukey"))
+summary(tuk)          # standard display
+tuk.cld <- cld(tuk)   # letter-based display
+opar <- par(mai=c(1,1,1.5,1))
+plot(tuk.cld, las=2)
+par(opar)
+
+cp.int <- with(col.pop, interaction(exp, soil))
+aov.col1 <- aov(surface ~ cp.int, data=col.pop)
+HSD.test(aov.col1, "cp.int", group=TRUE, console=TRUE)
+tuk <- glht(aov.col1, linfct = mcp(cp.int = "Tukey"))
+summary(tuk)          # standard display
+tuk.cld <- cld(tuk)   # letter-based display
+opar <- par(mai=c(1,1,1.5,1))
+plot(tuk.cld)
+par(opar)
+
+cp.int <- with(col.pop, interaction(exp, treat))
+aov.col1 <- aov(surface ~ cp.int, data=col.pop)
+HSD.test(aov.col1, "cp.int", group=TRUE, console=TRUE)
+tuk <- glht(aov.col1, linfct = mcp(cp.int = "Tukey"))
+summary(tuk)          # standard display
+tuk.cld <- cld(tuk)   # letter-based display
+opar <- par(mai=c(1,1,1.5,1))
+plot(tuk.cld)
+par(opar)
+```
+
+# Analysis of 15N enrichment in animal tissue
+## 15N enrichment in L. terrestris
+```{r 15N L. terrestris}
+bs4 <- diff(range(ew.iso$atpercent))/length(ew.iso$atpercent)
+ggplot(ew.iso, aes(x=atpercent)) + 
+  geom_histogram(binwidth = bs4 , fill="lightblue3", colour="black") + 
+  xlab(expression(paste(.^15,"N atom%"))) + 
+  ylab("frequency") +
+  ggtitle(expression(paste("Histogram of", .^15,"N Enrichment in tissue of ",italic(L.~terrestris))))
+
+
+# Overlap between Loam and Sand in %
+100*((with(ew.iso[ew.iso$soil=="S",], max(atpercent)) - with(ew.iso[ew.iso$soil=="L",], min(atpercent)))/with(ew.iso,max(atpercent) - min(atpercent)))
+
+maxRows <- by(ew.iso, ew.iso$soil, function(X) X[which.max(X$atpercent),])
+minRows <- by(ew.iso, ew.iso$soil, function(X) X[which.min(X$atpercent),])
+do.call("rbind", maxRows)
+do.call("rbind", minRows)
+
+ew.iso.plot <-  qplot(soil, atpercent, colour=treat, data=ew.iso) + 
+  geom_point(size=2.5) +
+  annotate("text", x=2,y=1.01+.02, label="max=1.01", vjust=0, col="red", size=4) +
+  annotate("text", x=1,y=0.74+.02, label="min=0.74", vjust=0,col="red", size=4) +
+  xlab("Soiltype") + 
+  ylab(expression(paste(.^15,"N atom%",sep=""))) + 
+  ggtitle(expression(paste("Label in ",italic("L. terrestris"))))+
+  scale_x_discrete(breaks=c("L","S"), labels=c("Loam", "Sand"))+
+  labs(colour="Treatment")+
+  scale_colour_discrete(labels=c("L.terrestris", "L. terrestris + F. candida")) + 
+  theme(panel.background= element_rect(fill="white"),
+        panel.grid.major = element_line(colour="grey"),
+        panel.grid.minor = element_line(colour="grey", linetype="dashed", size=0.2),
+        panel.border= element_rect(colour="black", fill=NA, size=1),
+        axis.text = element_text(colour="black", size=rel(1.3)),
+        axis.text.x = element_text(face="italic"),
+        axis.title=element_text(size=rel(1.4)),
+        legend.text=element_text(face="italic"))
+ew.iso.plot
+````
+
+# Analysis of 15N enrichment in L. terrestris
+```{r Analysis3}
+
+M.ew.iso <- lm(atpercent~treat*soil, data=ew.iso);anova(M.ew.iso);summary(M.ew.iso)
+M.ew.iso <- lm(atpercent~soil, data=ew.iso); anova(M.ew.iso);summary(M.ew.iso)
+lm.influence(M.ew.iso)
+influence.measures(M.ew.iso)$is.inf
+
+par(mfrow=c(2,2),
+    mar=c(3,3,3,3))
+plot(M.ew.iso)
+
+shapiro.test(ew.iso$atpercent)
+fligner.test(atpercent~soil, data=ew.iso)
+
+t.test(atpercent~soil, ew.iso)
+t.test(atpercent~soil,ew.iso, alternative="greater")
+
+with(ew.iso, list( tapply(atpercent, soil, mean),
+                   tapply(atpercent, soil, se)))
+```
+L. terrestris was significantly more enriched in loamy soil, compared to sandy soil 15N in tissue was with 1.04 +/- 0.08 atom% greater than  0.75 +/- 0.08 in sandy soil.
+
+## 15N enrichment in F.candida
+```{r 15N F. candida}
+#Histograms
+par(mfrow=c(2,1))
+hist(col.iso$atpercent)
+hist(col.iso$atpercent, main="breaks=12", breaks=12) # Too narrow --> breaks in Histogram
+
+list(range(col.iso$atpercent),
+range(col.iso$atpercent)[2] -
+range(col.iso$atpercent)[1])
+
+#There's a differnce between the Minima and Maxima of 0.896 atom percent
+# what differnce in atpercent is meaningful?
+
+with(col.iso, list(median(atpercent),
+                   mean(atpercent))) # median and mean are the same: 6.4 atom percent
+
+icept = median(col.iso$atpercent)
+
+col.iso.plot <- 
+  qplot(soil, atpercent, colour=treat, data=col.iso) + 
+  geom_point(size=2.5) + 
+  geom_hline(yintercept=icept, linetype="dashed", colour="red") +
+  annotate("text", label="Midline Max(Loam) - Min(Sand) y=6.4", x=1.5, y=6.44, size=4,colour="red") +
+  ggtitle(expression(paste("Label in ",italic("F. candida"))))+  
+  xlab("soiltexture") + 
+  ylab(expression(paste(.^15,"N atom%",sep=""))) + 
+  scale_x_discrete(breaks=c("L","S"), labels=c("Loam", "Sand"))+
+  scale_colour_discrete(labels=c("F.candida", "F. candida \n + L. terrestris")) + 
+  labs(colour="Treatment")+
+  theme(panel.background= element_rect(fill="white"),
+        panel.grid.major = element_line(colour="grey"),
+        panel.grid.minor = element_line(colour="grey", linetype="dashed", size=0.2),
+        panel.border= element_rect(colour="black", fill=NA, size=1),
+        axis.text = element_text(colour="black", size=rel(1.3)),
+        axis.text.x = element_text(face="italic"),
+        axis.title=element_text(size=rel(1.4)),
+        legend.text=element_text(face="italic"))
+col.iso.plot
+````
+
+```{r Analysis4}
+M.col.iso1 <- with(col.iso, aov(atpercent~treat*soil)); summary(M.col.iso1)
+M.col.iso2 <- with(col.iso, aov(atpercent~soil)); summary(M.col.iso2)
+# What other nutritional source could F. candida have had in Loam?
+          
+anova(M.col.iso1, M.col.iso2)
+AIC(M.col.iso1, M.col.iso2)
+
+M.col.iso3 <- lm(atpercent~soil, data=col.iso)
+lm.influence(M.col.iso3)
+influence.measures(M.col.iso3)$is.inf
+
+t.test(atpercent~soil, col.iso, alternative="less")
+
+with(col.iso, list( tapply(atpercent, soil, mean),
+                   tapply(atpercent, soil, se)))
+
+mean(col.iso$atpercent)
+se(col.iso$atpercent)
+
+```
+
+```{r Figure 15N Enrichment}
+organism <- factor(rep(c("italic(L.~terrestris)", "italic(F.~candida)"), each=12), levels=c("italic(L.~terrestris)", "italic(F.~candida)"))
+ew.col.iso <- rbind(ew.iso, col.iso)
+ew.col.iso$organism <- organism
+ew.col.iso$soil <- revalue(ew.col.iso$soil, c(L="Loam", S="Sand"))
+
+#long cut way to find number of facets
+len <- length(levels(ew.col.iso$organism))# *  length(levels(mtcars$am))
+vars <- data.frame(organism=levels(ew.col.iso$organism))
+y = with(ew.col.iso, tapply(atpercent,organism,max)-0.025)
+dat <- data.frame(x = rep(0.5, len), y = y, vars, labs=LETTERS[1:len])
+
+ggplot(ew.col.iso, aes(x=soil, y=atpercent), family="Arial") + 
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="grey", lwd=0.2, outlier.size=0.4, outlier.shape=21) +  
+  facet_grid(organism ~ . , scales="free", space="free",labeller=label_parsed) + 
+  ylab("atom %") + 
+  xlab("soil texture") + 
+  geom_text(aes(x, y, label=labs, group=NULL),data=dat) +
+  # ggtitle(expression(paste(.^15,"N enrichment in animal tissue"))) +
+  mytheme
+
+
+
+#setwd("D:/Quentin Schorpp/Schreibtisch/2 - Laborversuche/Mikrokosmen/Manuskript/Entwurf")
+#ggsave("Figure1.pdf", width=9, height=7, units="cm", useDingbats=FALSE) 
+#embed_fonts("Figure1.pdf", outfile="Figure1.pdf")
+#ggsave("Figure1.svg", width=9, height=7, units="cm") 
+```
+
+
+# N2O and CO2 gas fluxes
+Measurements from continous flow samples.
+***********************************************************************************************************************************
+#### N2O [ppb] data formatting
+```{r N2O Production rates}
+n2o.index <- n2o.ppb[,1:4]
+n2o.index$treat <- factor(n2o.index$treat, levels=c("Lt", "Fc", "int", "C"))
+n2o.blanks <- n2o.ppb[57:59,5:19]
+n2o.ppb <- n2o.ppb[1:56,5:19]
+
+# mean for blanks
+n2o.blanks.mean=matrix(rep(0,15),1)
+for (i in 1:15)
+  {a=mean(n2o.blanks[,i])
+	 n2o.blanks.mean[1,i]=a
+	}
+
+# subtract blanks from MC measurements
+for (i in 1:15)
+  {for (j in 1:56)
+   {n2o.ppb[j,i] = n2o.ppb[j,i]-n2o.blanks.mean[,i]
+  }
+	} 
+# eliminate negative values
+n2o.ppb[n2o.ppb<0] = 0
+
+
+# multiplication with gasflow
+n2o.prod=n2o.ppb*gasflow[,5:19]*10^-9*60 #[ml/h]  ### ppb beachten, zeitumrechnen
+### umrechnen von ml auf ?g
+n2o.prod=n2o.prod*44/22.4*1000 #[?g/h]
+### auf das Bodengewicht beziehen;  soil dry weight: 1080g
+n2o.bod=n2o.prod/1.080  #[?g/(kg h)
+### calculate N2O-N, Anteil an molarer Masse 28/44
+n2o=n2o.bod*28/44  #[?g/(kg h)]
+
+n2o.max <- melt(n2o, id.vars=1)
+which.max(n2o.max$value)
+n2o.max[which(n2o.max$value>15),]
+
+n2o.PR <- n2o
+n2o.PR$max.iniloam <- apply(n2o[,-c(1,6:16)],1,max)
+n2o.PR$max.ewloam <- apply(n2o[,-c(1:5)],1,max)
+n2o.PR$max.sand <- apply(n2o[,-1],1,max)
+n2o.PR  <- cbind(n2o.index[1:56,],n2o.PR[,17:19])
+
+with(n2o.PR, tapply(max.sand, list(experiment, soil), mean))
+with(n2o.PR, tapply(max.sand, list(experiment, soil), se))
+
+
+```
+
+#### Calculation of MEAN production rates N2O
+```{r N2O Means + SE}
+Kopf=c("Tag 1","Tag 3","Tag 5","Tag 7","Tag 11","Tag 15","Tag 18","Tag 21","Tag 25","Tag 28","Tag 32","Tag 35","Tag 39","Tag 42","Tag 48")
+
+#Treatment code
+n2o.index$code <- with(n2o.index, factor(interaction(treat,soil,experiment), levels= c("Lt.Loam.exp1", "int.Loam.exp1", "Fc.Loam.exp1", "C.Loam.exp1","Lt.Sand.exp1","int.Sand.exp1","Fc.Sand.exp1","C.Sand.exp1", "Lt.Loam.exp2","int.Loam.exp2","Fc.Loam.exp2","C.Loam.exp2","Lt.Sand.exp2","int.Sand.exp2","Fc.Sand.exp2","C.Sand.exp2")))
+
+n2o <- cbind(code=n2o.index[1:56,5], n2o)
+# MK8 und MK22 l?schen weil da Lt tot
+n2o.red=n2o[c(-8,-22),]
+n2o.red <- droplevels(n2o.red)
+
+str(n2o.red)
+
+#### MW nach Treatment bilden ProdRate ####
+n2o.means=matrix(rep(0,240),16)
+for (j in 2:16)
+{a=tapply(n2o.red[,j],n2o.red[,1],mean)
+ n2o.means[,(j-1)]=a
+}
+
+colnames(n2o.means)<-dimnames(n2o[,2:16])[[2]]
+n2o.means <- data.frame(n2o.means)
+n2o.means <- cbind(unique(n2o.index[1:56,-c(1,5)][c(-8,-22),]),n2o.means)
+head(n2o.means)
+
+#### Standardfehler ProdRate ####
+n2o.se=matrix(rep(0,240),16)
+for (j in 2:16)
+{b=tapply(n2o.red[,j],n2o.red[,1],se)
+ n2o.se[,(j-1)]=b
+}
+
+colnames(n2o.se)<-dimnames(n2o[,2:16])[[2]]
+n2o.se <- data.frame(n2o.se)
+n2o.se <- cbind(unique(n2o.index[1:56,-c(1,5)][c(-8,-22),]),n2o.se)
+head(n2o.se)
+
+#### means with standard error N2O ####
+n2o.means2=round(n2o.means[,4:18],2)
+n2o.se2=round(n2o.se[,4:18],2)
+
+n2o.mean.se=matrix(rep(0,240),16)
+for (i in 1:16)
+{for (j in 1:15)
+{a=paste(n2o.means2[i,j],"?",n2o.se2[i,j])
+ n2o.mean.se[i,j]=a
+}
+}
+colnames(n2o.mean.se)<-dimnames(n2o[,2:16])[[2]]
+n2o.mean.se <- data.frame(n2o.mean.se)
+n2o.mean.se <- cbind(unique(n2o.index[1:56,-c(1,5)][c(-8,-22),]),n2o.mean.se)
+head(n2o.se)
+
+```
+
+#### Calculation of cumulative N2O
+```{r N2O Cumulative}
+#### kumuliertes N.N2O ####
+code <- n2o.red[,1]
+n2o.red <- n2o.red[,-1]
+
+days=c(1,3,5,7,11,15,18,21,25,28,32,35,39,42,48)
+
+n2o.rz=rbind(days,n2o.red)
+
+#N2O between two sampling dates
+n2o.btw=matrix(rep(0,756),54)
+for (i in 2:55)
+{for (j in 1:14)
+{Zeit=(n2o.rz[1,(j+1)]-n2o.rz[1,j])*24  #*24da Zeit d in std umgerechnet werden muss
+ a=Zeit*n2o.rz[i,j]+0.5*Zeit*(n2o.rz[i,(j+1)]-n2o.rz[i,j])
+ n2o.btw[(i-1),j]=a
+}
+}
+
+# cumulative N2O for all samples
+n2o.cum=matrix(rep(0,756),54)
+for (i in 1:54) {
+  for (j in 1:14) {
+    a=sum(n2o.btw[i,1:j])
+    n2o.cum[i,j]=a    
+  }  
+}
+
+colnames(n2o.cum)<-days[-1]
+cbind(n2o.index[-c(8,22,57:59),],n2o.cum)
+
+
+# Means for treatments 
+n2o.btw.mean=matrix(rep(0,224),16) #Matrix f?r MW der kum N2O Werte
+for (j in 1:14)  #MW bilden
+{a=tapply(n2o.btw[,j],code,mean)
+ n2o.btw.mean[,j]=a
+}
+# Standard error
+n2o.btw.se=matrix(rep(0,224),16) #Matrix f?r StdFehler der kum N2O Werte
+for (j in 1:14)  #SE bilden
+{a=tapply(n2o.btw[,j],code,se)
+ n2o.btw.se[,j]=a
+}
+
+# summed 
+n2o.cum.mean=matrix(rep(0,224),16)   #Matrix f?r kum n20 ?ber die zeit
+for (i in 1:16)
+{for (j in 1:14)
+{a=sum(n2o.btw.mean[i,1:j])
+ n2o.cum.mean[i,j]=a
+}
+}
+
+colnames(n2o.cum.mean) <- days[-1]
+n2o.cum.mean <- cbind(unique(n2o.index[1:56,-c(1,5)][c(-8,-22),]),n2o.cum.mean)
+
+##### Kum- n2o: Std.Fehler durch Fehlerfortpflanzung ####
+n2o.cum.se=matrix(rep(0,224),16)   #Matrix f?r stdfehler fortpflanzung kum n20 ?ber die zeit
+for (i in 1:16)
+{for (j in 1:14)
+{a=sqrt(sum((n2o.btw.se[i,1:j])^2)) 
+ n2o.cum.se[i,j]=a
+}
+}
+
+colnames(n2o.cum.se) <- days[-1]
+n2o.cum.se <- cbind(unique(n2o.index[1:56,-c(1,5)][c(-8,-22),]),n2o.cum.se)
+
+# for plots use n2o.cum.mean ans n2o.cum.se
+# for analysis use n2o.cum
+````
+  
+# Analysis
+```{r}
+# data = n2o.cum
+
+n2o.index$Lt <- revalue(n2o.index$treat, c(Lt=1, int=1, Fc=0, C=0))
+n2o.index$Fc <- revalue(n2o.index$treat, c(Lt=0, int=1, Fc=1, C=0))
+
+n2o.cum <- as.data.frame(cbind(n2o.index[c(1:56),][-c(8,22),], n2o.cum))
+colnames(n2o.cum)[21] <- "nc"
+colnames(n2o.cum)[4] <- "exp"
+
+n2o.cum <- droplevels(n2o.cum)
+
+### Experiment 1
+
+# multimodel averaging
+x <- c("Lt","Fc","exp","soil")
+nc.0 <- lm(nc~Lt*Fc*soil, n2o.cum[!(n2o.cum$exp=="exp2"),])
+#t(combn(x,3))
+nc.1 <- lm(nc~Lt*Fc, n2o.cum[!(n2o.cum$exp=="exp2"),])
+nc.2 <- lm(nc~Lt*soil, n2o.cum[!(n2o.cum$exp=="exp2"),])
+nc.3 <- lm(nc~Fc*soil, n2o.cum[!(n2o.cum$exp=="exp2"),])
+#t(combn(x,2))
+nc.4 <- lm(nc~Lt, n2o.cum[!(n2o.cum$exp=="exp2"),])
+nc.5 <- lm(nc~Fc, n2o.cum[!(n2o.cum$exp=="exp2"),])
+nc.6 <- lm(nc~soil, n2o.cum[!(n2o.cum$exp=="exp2"),])
+
+nc.7 <- lm(nc~1, n2o.cum[!(n2o.cum$exp=="exp2"),])
+
+AICctab(nc.0,  nc.1,  nc.2,  nc.3,  nc.4,  nc.5,  nc.6,  nc.7)
+
+#as.character(rep("nc",c(1:15)))
+#x <- factor(paste("nc",".",c(0:15),",",sep=""), levels=)
+#print(x)
+#x <- factor(paste("nc",".",c(0:15)," <- ",sep=""), levels=)
+#as.data.frame(x)
+
+summary.aov(nc.2)
+par(mfrow=c(2,2))
+plot(nc.2)
+par(mfrow=c(1,1))
+boxcox(nc.2)
+#locator(1)
+
+nc.2 <- update(nc.2,I(1/nc^(1/5))~.)
+summary.aov(nc.2)
+par(mfrow=c(2,2))
+plot(nc.2)
+
+nc.aov2 <- aov(nc~Lt*soil, n2o.cum[!(n2o.cum$exp=="exp2"),])
+nc.aov2 <- update(nc.aov2,I(1/nc^(1/5))~.)
+TukeyHSD(nc.aov2)
+nc.int <- with(n2o.cum[!(n2o.cum$exp=="exp2"),], interaction(soil,Lt)) # Double interaction factor
+nc.aov3 <- update(nc.aov2,.~nc.int)
+HSD.test(nc.aov3, "nc.int", group=TRUE, console=TRUE)
+
+txt.nc = expression(paste("Nitrous Oxide ", N[2],"O [?g ",N[2],"O-N ",kg^-1,"]"))
+ggplot(n2o.cum[!(n2o.cum$exp=="exp2"),], aes(x=Lt, y=nc), family="Arial") + 
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="grey", lwd=0.2, outlier.size=0.4, outlier.shape=21) +  
+  facet_grid( .~ soil , scales="free", space="free",labeller=label_parsed) + 
+  ylab(txt.nc) + 
+  xlab("L. terrestris") + 
+  scale_x_discrete(labels=c("absent", "present")) +
+  ggtitle("Experiment 1") +
+  mytheme
+
+
+nc.int <- with(n2o.cum[!(n2o.cum$exp=="exp2"),], interaction(soil,Lt)) # Double interaction factor
+nc.aov3 <- update(nc.aov2,.~nc.int)
+HSD.test(nc.aov3, "nc.int", group=TRUE, console=TRUE)
+
+with(n2o.cum[!(n2o.cum$exp=="exp1"),], list(round(tapply(nc, interaction(treat,soil), mean),0),
+                                            round(tapply(nc, interaction(treat,soil), se),0)))
+                                            
+                                            
+with(n2o.cum[!(n2o.cum$exp=="exp2"),], list(round(tapply(nc, interaction(Lt,soil), mean),0),
+                   round(tapply(nc, interaction(Lt,soil), se),0)))
+
+
+### Experiment 1
+
+# multimodel averaging
+x <- c("Lt","Fc","exp","soil")
+nc.0 <- lm(nc~Lt*Fc*soil, n2o.cum[!(n2o.cum$exp=="exp1"),])
+#t(combn(x,3))
+nc.1 <- lm(nc~Lt*Fc, n2o.cum[!(n2o.cum$exp=="exp1"),])
+nc.2 <- lm(nc~Lt*soil, n2o.cum[!(n2o.cum$exp=="exp1"),])
+nc.3 <- lm(nc~Fc*soil, n2o.cum[!(n2o.cum$exp=="exp1"),])
+#t(combn(x,2))
+nc.4 <- lm(nc~Lt, n2o.cum[!(n2o.cum$exp=="exp1"),])
+nc.5 <- lm(nc~Fc, n2o.cum[!(n2o.cum$exp=="exp1"),])
+nc.6 <- lm(nc~soil, n2o.cum[!(n2o.cum$exp=="exp1"),])
+
+nc.7 <- lm(nc~1, n2o.cum[!(n2o.cum$exp=="exp1"),])
+
+AICctab(nc.0,  nc.1,  nc.2,  nc.3,  nc.4,  nc.5,  nc.6,  nc.7)
+
+#as.character(rep("nc",c(1:15)))
+#x <- factor(paste("nc",".",c(0:15),",",sep=""), levels=)
+#print(x)
+#x <- factor(paste("nc",".",c(0:15)," <- ",sep=""), levels=)
+#as.data.frame(x)
+
+summary.aov(nc.2)
+summary.aov(nc.0)
+par(mfrow=c(2,2))
+plot(nc.2)
+par(mfrow=c(1,1))
+boxcox(nc.2)
+# locator(1)
+fligner.test(nc~interaction(Lt,soil), n2o.cum[!(n2o.cum$exp=="exp1"),])
+
+
+nc.aov2 <- aov(nc~Lt*soil, n2o.cum[!(n2o.cum$exp=="exp1"),])
+TukeyHSD(nc.aov2)
+nc.int <- with(n2o.cum[!(n2o.cum$exp=="exp1"),], interaction(soil,Lt)) # Double interaction factor
+nc.aov3 <- update(nc.aov2,.~nc.int)
+HSD.test(nc.aov3, "nc.int", group=TRUE, console=TRUE)
+
+txt.nc = expression(paste("Nitrous Oxide ", N[2],"O [?g ",N[2],"O-N ",kg^-1,"]"))
+ggplot(n2o.cum[!(n2o.cum$exp=="exp1"),], aes(x=Lt, y=nc), family="Arial") + 
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="grey", lwd=0.2, outlier.size=0.4, outlier.shape=21) +  
+  facet_grid( .~ soil , scales="free", space="free",labeller=label_parsed) + 
+  ylab(txt.nc) + 
+  xlab("L. terrestris") + 
+  scale_x_discrete(labels=c("absent", "present")) +
+  ggtitle("Experiment 2") +
+  mytheme
+
+
+nc.int <- with(n2o.cum[!(n2o.cum$exp=="exp1"),], interaction(soil,Lt,Fc)) # Double interaction factor
+nc.aov3 <- update(nc.aov2,.~nc.int)
+HSD.test(nc.aov3, "nc.int", group=TRUE, console=TRUE)
+
+with(n2o.cum[!(n2o.cum$exp=="exp1"),], list(round(tapply(nc, interaction(Lt,soil), mean),0),
+                   round(tapply(nc, interaction(Lt,soil), se),0)))
+```
+
+
+### CO2 [ppm] data fromatting
+```{r CO2 Production rates}
+co2.index <- co2.ppm[,1:4]
+co2.index$treat <- factor(co2.index$treat, levels=c("Lt", "Fc", "int", "C"))
+co2.blanks <- co2.ppm[57:59,5:19]
+co2.ppm <- co2.ppm[1:56,5:19]
+
+# mean for blanks
+co2.blanks.mean=matrix(rep(0,15),1)
+for (i in 1:15)
+  {a=mean(co2.blanks[,i])
+   co2.blanks.mean[1,i]=a
+	}
+
+# subtract blanks from MC measurements
+for (i in 1:15)
+  {for (j in 1:56)
+   {co2.ppm[j,i] = co2.ppm[j,i]-co2.blanks.mean[,i]
+  }
+	} 
+
+co2.ppm[co2.ppm<0] = 0
+
+
+# multiplication with gasflow
+
+co2.prod=co2.ppm*gasflow[,5:19]*10^-6*60 #[ml/h]  ### ppm beachten, zeitumrechnen
+### umrechnen von ml auf ?g
+co2.prod=co2.prod*44/22.4*1000 #[?g/h]
+### auf das Bodengewicht beziehen;  soil dry weight: 1080g
+co2.bod=co2.prod/1.080  #[?g/(kg h)
+### calculate co2-N, Anteil an molarer Masse 28/44
+co2=co2.bod*12/44  #[?g/(kg h)]
+```
+
+
+#### Calculation of mean production rates co2
+```{r CO2 Mean + SE}
+Kopf=c("Tag 1","Tag 3","Tag 5","Tag 7","Tag 11","Tag 15","Tag 18","Tag 21","Tag 25","Tag 28","Tag 32","Tag 35","Tag 39","Tag 42","Tag 48")
+
+#Treatment code
+co2.index$code <- with(co2.index, factor(interaction(treat,soil,experiment), levels= c("Lt.Loam.exp1", "int.Loam.exp1", "Fc.Loam.exp1", "C.Loam.exp1","Lt.Sand.exp1","int.Sand.exp1","Fc.Sand.exp1","C.Sand.exp1", "Lt.Loam.exp2","int.Loam.exp2","Fc.Loam.exp2","C.Loam.exp2","Lt.Sand.exp2","int.Sand.exp2","Fc.Sand.exp2","C.Sand.exp2")))
+
+co2 <- cbind(code=co2.index[1:56,5], co2)
+# MK8 und MK22 l?schen weil da Lt tot
+co2.red=co2[c(-8,-22),]
+co2.red <- droplevels(co2.red)
+
+str(co2.red)
+
+#### MW nach Treatment bilden ProdRate ####
+co2.means=matrix(rep(0,240),16)
+for (j in 2:16)
+{a=tapply(co2.red[,j],co2.red[,1],mean)
+ co2.means[,(j-1)]=a
+}
+
+colnames(co2.means)<-dimnames(co2[,2:16])[[2]]
+co2.means <- data.frame(co2.means)
+co2.means <- cbind(unique(co2.index[1:56,-c(1,5)][c(-8,-22),]),co2.means)
+head(co2.means)
+
+#### Standardfehler ProdRate ####
+co2.se=matrix(rep(0,240),16)
+for (j in 2:16)
+{b=tapply(co2.red[,j],co2.red[,1],se)
+ co2.se[,(j-1)]=b
+}
+
+colnames(co2.se)<-dimnames(co2[,2:16])[[2]]
+co2.se <- data.frame(co2.se)
+co2.se <- cbind(unique(co2.index[1:56,-c(1,5)][c(-8,-22),]),co2.se)
+head(co2.se)
+
+#### means with standard error co2 ####
+co2.means2=round(co2.means[,4:18],2)
+co2.se2=round(co2.se[,4:18],2)
+
+co2.mean.se=matrix(rep(0,240),16)
+for (i in 1:16)
+{for (j in 1:15)
+{a=paste(co2.means2[i,j],"?",co2.se2[i,j])
+ co2.mean.se[i,j]=a
+}
+}
+colnames(co2.mean.se)<-dimnames(co2[,2:16])[[2]]
+co2.mean.se <- data.frame(co2.mean.se)
+co2.mean.se <- cbind(unique(co2.index[1:56,-c(1,5)][c(-8,-22),]),co2.mean.se)
+head(co2.se)
+
+```
+
+#### Calculation of cumulative CO2
+```{r CO2 cumulative}
+#### kumuliertes N.co2 ####
+code <- co2.red[,1]
+co2.red <- co2.red[,-1]
+
+days=c(1,3,5,7,11,15,18,21,25,28,32,35,39,42,48)
+
+co2.rz=rbind(days,co2.red)
+
+#co2 between two sampling dates
+co2.btw=matrix(rep(0,756),54)
+for (i in 2:55)
+{for (j in 1:14)
+{Zeit=(co2.rz[1,(j+1)]-co2.rz[1,j])*24  #*24da Zeit d in std umgerechnet werden muss
+ a=Zeit*co2.rz[i,j]+0.5*Zeit*(co2.rz[i,(j+1)]-co2.rz[i,j])
+ co2.btw[(i-1),j]=a
+}
+}
+
+# cumulative co2 for all samples
+co2.cum=matrix(rep(0,756),54)
+for (i in 1:54) {
+  for (j in 1:14) {
+    a=sum(co2.btw[i,1:j])
+    co2.cum[i,j]=a    
+  }  
+}
+
+colnames(co2.cum)<-days[-1]
+cbind(co2.index[-c(8,22,57:59),],co2.cum)
+
+
+# Means for treatments 
+co2.btw.mean=matrix(rep(0,224),16) #Matrix f?r MW der kum co2 Werte
+for (j in 1:14)  #MW bilden
+{a=tapply(co2.btw[,j],code,mean)
+ co2.btw.mean[,j]=a
+}
+# Standard error
+co2.btw.se=matrix(rep(0,224),16) #Matrix f?r StdFehler der kum co2 Werte
+for (j in 1:14)  #SE bilden
+{a=tapply(co2.btw[,j],code,se)
+ co2.btw.se[,j]=a
+}
+
+# summed 
+co2.cum.mean=matrix(rep(0,224),16)   #Matrix f?r kum n20 ?ber die zeit
+for (i in 1:16)
+{for (j in 1:14)
+{a=sum(co2.btw.mean[i,1:j])
+ co2.cum.mean[i,j]=a
+}
+}
+
+colnames(co2.cum.mean) <- days[-1]
+co2.cum.mean <- cbind(unique(co2.index[1:56,-c(1,5)][c(-8,-22),]),co2.cum.mean)
+
+##### Kum- co2: Std.Fehler durch Fehlerfortpflanzung ####
+co2.cum.se=matrix(rep(0,224),16)   #Matrix f?r stdfehler fortpflanzung kum n20 ?ber die zeit
+for (i in 1:16)
+{for (j in 1:14)
+{a=sqrt(sum((co2.btw.se[i,1:j])^2)) 
+ co2.cum.se[i,j]=a
+}
+}
+
+colnames(co2.cum.se) <- days[-1]
+co2.cum.se <- cbind(unique(co2.index[1:56,-c(1,5)][c(-8,-22),]),co2.cum.se)
+
+# for plots use co2.cum.mean ans co2.cum.se
+# for analysis use co2.cum
+````
+Analysis
+```{r}
+# data = co2.cum
+
+co2.index$Lt <- revalue(co2.index$treat, c(Lt=1, int=1, Fc=0, C=0))
+co2.index$Fc <- revalue(co2.index$treat, c(Lt=0, int=1, Fc=1, C=0))
+
+co2.cum <- as.data.frame(cbind(co2.index[c(1:56),][-c(8,22),], co2.cum))
+colnames(co2.cum)[21] <- "cc"
+colnames(co2.cum)[4] <- "exp"
+
+co2.cum <- droplevels(co2.cum)
+co2.cum.org <- co2.cum
+#co2.cum <- co2.cum.org
+
+co2.cum <- co2.cum[-1,]
+co2.cum <- co2.cum[-1,]
+
+
+### Experiment 1
+
+# multimodel averaging
+x <- c("Lt","Fc","exp","soil")
+cc.0 <- lm(cc~Lt*Fc*soil, co2.cum[!(co2.cum$exp=="exp2"),])
+#t(combn(x,3))
+cc.1 <- lm(cc~Lt*Fc, co2.cum[!(co2.cum$exp=="exp2"),])
+cc.2 <- lm(cc~Lt*soil, co2.cum[!(co2.cum$exp=="exp2"),])
+cc.3 <- lm(cc~Fc*soil, co2.cum[!(co2.cum$exp=="exp2"),])
+#t(combn(x,2))
+cc.4 <- lm(cc~Lt, co2.cum[!(co2.cum$exp=="exp2"),])
+cc.5 <- lm(cc~Fc, co2.cum[!(co2.cum$exp=="exp2"),])
+cc.6 <- lm(cc~soil, co2.cum[!(co2.cum$exp=="exp2"),])
+
+cc.7 <- lm(cc~1, co2.cum[!(co2.cum$exp=="exp2"),])
+
+AICctab(cc.0,  cc.1,  cc.2,  cc.3,  cc.4,  cc.5,  cc.6,  cc.7)
+
+#as.character(rep("cc",c(1:15)))
+#x <- factor(paste("cc",".",c(0:15),",",sep=""), levels=)
+#print(x)
+#x <- factor(paste("cc",".",c(0:15)," <- ",sep=""), levels=)
+#as.data.frame(x)
+
+summary.aov(cc.2)
+summary.aov(cc.0)
+par(mfrow=c(2,2))
+plot(cc.0)
+par(mfrow=c(1,1))
+boxcox(cc.0, lambda=c(-50,50,5))
+locator(1)
+
+cc.0 <- update(cc.0,I(cc*10^-3)~.)
+summary.aov(cc.0)
+par(mfrow=c(2,2))
+plot(cc.0)
+
+cc.aov2 <- aov(cc~Lt*soil*Fc, co2.cum[!(co2.cum$exp=="exp2"),])
+cc.aov2 <- update(cc.aov2,I(cc*10^-3)~.)
+TukeyHSD(cc.aov2)
+cc.int <- with(co2.cum[!(co2.cum$exp=="exp2"),], interaction(soil,treat)) # Double interaction factor
+cc.aov3 <- update(cc.aov2,.~cc.int)
+HSD.test(cc.aov3, "cc.int", group=TRUE, console=TRUE)
+
+txt.cc = expression(paste("Carbon Dioxide", CO[2]," [mg ",CO[2],"-C ",kg^-1,"]"))
+ggplot(co2.cum[!(co2.cum$exp=="exp2"),], aes(x=treat, y=cc), family="Arial") + 
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="grey", lwd=0.2, outlier.size=0.4, outlier.shape=21) +  
+  facet_grid( .~ soil , scales="free", space="free",labeller=label_parsed) + 
+  ylab(txt.cc) + 
+  xlab("L. terrestris") + 
+  #scale_x_discrete(labels=c("absent", "present")) +
+  ggtitle("Experiment 1") +
+  mytheme
+
+
+cc.int <- with(co2.cum[!(co2.cum$exp=="exp2"),], interaction(soil,Lt)) # Double interaction factor
+cc.aov3 <- update(cc.aov2,.~cc.int)
+HSD.test(cc.aov3, "cc.int", group=TRUE, console=TRUE)
+
+with(co2.cum[!(co2.cum$exp=="exp2"),], list(round(tapply(cc, interaction(treat,soil), mean),0),
+                                            round(tapply(cc, interaction(treat,soil), se),0)))
+                                            
+                                            
+with(co2.cum[!(co2.cum$exp=="exp2"),], list(round(tapply(cc, interaction(Lt,soil), mean),0),
+                   round(tapply(cc, interaction(Lt,soil), se),0)))
+
+
+### Experiment 1
+
+# multimodel averaging
+x <- c("Lt","Fc","exp","soil")
+cc.0 <- lm(cc~Lt*Fc*soil, co2.cum[!(co2.cum$exp=="exp1"),])
+#t(combn(x,3))
+cc.1 <- lm(cc~Lt*Fc, co2.cum[!(co2.cum$exp=="exp1"),])
+cc.2 <- lm(cc~Lt*soil, co2.cum[!(co2.cum$exp=="exp1"),])
+cc.3 <- lm(cc~Fc*soil, co2.cum[!(co2.cum$exp=="exp1"),])
+#t(combn(x,2))
+cc.4 <- lm(cc~Lt, co2.cum[!(co2.cum$exp=="exp1"),])
+cc.5 <- lm(cc~Fc, co2.cum[!(co2.cum$exp=="exp1"),])
+cc.6 <- lm(cc~soil, co2.cum[!(co2.cum$exp=="exp1"),])
+
+cc.7 <- lm(cc~1, co2.cum[!(co2.cum$exp=="exp1"),])
+
+AICctab(cc.0,  cc.1,  cc.2,  cc.3,  cc.4,  cc.5,  cc.6,  cc.7)
+
+#as.character(rep("cc",c(1:15)))
+#x <- factor(paste("cc",".",c(0:15),",",sep=""), levels=)
+#print(x)
+#x <- factor(paste("cc",".",c(0:15)," <- ",sep=""), levels=)
+#as.data.frame(x)
+
+summary.aov(cc.2)
+par(mfrow=c(2,2))
+plot(cc.2)
+par(mfrow=c(1,1))
+boxcox(cc.2)
+# locator(1)
+fligner.test(cc~interaction(Lt,soil), co2.cum[!(co2.cum$exp=="exp1"),])
+
+
+cc.aov2 <- aov(cc~Lt*soil, co2.cum[!(co2.cum$exp=="exp1"),])
+TukeyHSD(cc.aov2)
+cc.int <- with(co2.cum[!(co2.cum$exp=="exp1"),], interaction(soil,Lt)) # Double interaction factor
+cc.aov3 <- update(cc.aov2,.~cc.int)
+HSD.test(cc.aov3, "cc.int", group=TRUE, console=TRUE)
+
+txt.cc = expression(paste("Carbon Dioxide", CO[2]," [mg ",CO[2],"-C ",kg^-1,"]"))
+ggplot(co2.cum[!(co2.cum$exp=="exp1"),], aes(x=Lt, y=cc), family="Arial") + 
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="grey", lwd=0.2, outlier.size=0.4, outlier.shape=21) +  
+  facet_grid( .~ soil , scales="free", space="free",labeller=label_parsed) + 
+  ylab(txt.cc) + 
+  xlab("L. terrestris") + 
+  scale_x_discrete(labels=c("absent", "present")) +
+  ggtitle("Experiment 2") +
+  mytheme
+
+
+cc.int <- with(co2.cum[!(co2.cum$exp=="exp1"),], interaction(soil,Lt,Fc)) # Double interaction factor
+cc.aov3 <- update(cc.aov2,.~cc.int)
+HSD.test(cc.aov3, "cc.int", group=TRUE, console=TRUE)
+
+with(co2.cum[!(co2.cum$exp=="exp1"),], list(round(tapply(cc, interaction(Lt,soil), mean),0),
+                   round(tapply(cc, interaction(Lt,soil), se),0)))
+```
+
+#### Multipanel plots for Gas fluxes of N2O and CO2
+```{r Gas flux Multipanel plot}
+
+measure=rep(c("mean","se"),each=16)
+
+A=cbind(melt(cbind(measure=measure,rbind(n2o.cum.mean,n2o.cum.se)), id.vars= c(1:4))[,1:5],
+      n2o.cum=melt(cbind(measure=measure,rbind(n2o.cum.mean,n2o.cum.se)), id.vars= c(1:4))$value,
+      co2.cum=melt(cbind(measure=measure,rbind(co2.cum.mean,co2.cum.se)), id.vars= c(1:4))$value)
+B=cbind(melt(cbind(measure=measure,rbind(n2o.means,n2o.se)),         id.vars= c(1:4))[,1:5],
+      n2o=melt(cbind(measure=measure,rbind(n2o.means,n2o.se)),     id.vars= c(1:4))$value,
+      co2=melt(cbind(measure=measure,rbind(co2.means,co2.se)),    id.vars= c(1:4))$value)
+
+C=A[1:32,]
+C[,6:7]=NA
+C[,5]=1
+A=rbind(C,A)
+fig2.extended=cbind(A,B[6:7])
+colnames(fig2.extended)[[5]] <- "day"
+fig2.extended$day <- as.integer(fig2.extended$day)
+fig2.x  <- melt(fig2.extended, id.vars= c(1:5)) 
+fig2.x  <- dcast(fig2.x, treat+soil+variable+day+experiment~measure) 
+fig2.x  <- fig2.x[order(fig2.x$experiment ),]
+fig2.x$variable <- revalue(fig2.x$variable, c(n2o="paste(N[2],O)~Production~Rate",co2= "paste(CO[2])~Production~Rate", n2o.cum="Cumulative~paste(N[2],O)", co2.cum="Cumulative~CO[2]"))
+fig2.x$variable <- factor(fig2.x$variable, levels=c("paste(N[2],O)~Production~Rate","Cumulative~paste(N[2],O)", "paste(CO[2])~Production~Rate","Cumulative~CO[2]"))
+
+txt.ylab = expression(paste(CO[2],"[?g ",CO[2],"-C ",kg^-1,"]",
+                                 "       ", 
+                                 CO[2],"[?g ",CO[2],"-C ",kg^-1, h^-1,"]",
+                                 "      ",
+                                 N[2],"O [?g ",N[2],"O-N ",kg^-1,"]",
+                                 "       ", 
+                                 N[2],"O [?g ",N[2],"O-N ",kg^-1, h^-1,"]"))
+
+pd = position_dodge(0.2)
+ggplot(data=fig2.x, aes(x=day, y=mean, group=treat, shape=treat)) + 
+  geom_point(size=1.5, position=pd, fill="white") + 
+  geom_line (size=0.35, position=pd) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=4, size=0.2, position=pd) + 
+  xlab("Days [d]") +
+  ylab(txt.ylab) +
+  facet_grid(variable~experiment+soil, scales ="free", labeller=label_parsed) + 
+  scale_shape_manual(values=c(17,15,16,21), 
+                     labels=c("L. terrestris","Interaction","F. candida", "Control")) + 
+                     #limits=c("L. terrestris","F. candida","Interaction","Control")) +
+  labs(shape="Treatment:") +
+  mytheme + theme(legend.position="bottom")
+````
+
+
+#### Figure1 Multipanel plot with distinct variables
+```{r Figure 1}
+fig2  <- melt(fig2, id.vars= c(1:5)) 
+fig2  <- dcast(fig2, treat+soil+variable+day+Experiment~measure) 
+fig2$variable <- revalue(fig2$variable, c(nitox="paste(N[2],O)~Production~Rate", nitox_cum="Cumulative~paste(N[2],O)", carbon="Cumulative~CO[2]"))
+fig2$variable <- factor(fig2$variable, levels=c("paste(N[2],O)~Production~Rate","Cumulative~paste(N[2],O)", "Cumulative~CO[2]"))
+
+txt.cum_nitox = expression(paste(CO[2],"[?g ",CO[2],"-C ",kg^-1,"]",
+                                 "                       ",
+                                 N[2],"O [?g ",N[2],"O-N ",kg^-1,"]",
+                                 "                       ",
+                                 N[2],"O [?g ",N[2],"O-N ",kg^-1, h^-1,"]"))
+
+pd = position_dodge(0.2)
+ggplot(data=fig2, aes(x=day, y=mean, group=treat, shape=treat)) + 
+  geom_point(size=2.0, position=pd, fill="white") + 
+  geom_line (size=0.35, position=pd) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=4, size=0.2, position=pd) + 
+  xlab("Days [d]") +
+  ylab(txt.cum_nitox) +
+  facet_grid(variable~soil, scales ="free", labeller=label_parsed) + 
+  scale_shape_manual(values=c(21,16,15,17), 
+                     labels=c("Control","F. candida","Interaction", "L. terrestris")) + 
+  #                   limits=c("L. terrestris","F. candida","Interaction","Control")) +
+  labs(shape=" ") +
+  mytheme +
+  theme(legend.position=c(0.57,0.9) )#+
+       #legend.position="bottom"))
+
+## ggsave("Figure 1.pdf", width=19, height=15, units="cm", useDingbats=FALSE)
+```
+ Appendix A
+```{r Appendix A}
+measure=rep(c("mean","se"),each=16)
+
+A=cbind(melt(cbind(measure=measure,rbind(n2o.cum.mean,n2o.cum.se)), id.vars= c(1:4))[,1:5],
+      n2o.cum=melt(cbind(measure=measure,rbind(n2o.cum.mean,n2o.cum.se)), id.vars= c(1:4))$value,
+      co2.cum=melt(cbind(measure=measure,rbind(co2.cum.mean,co2.cum.se)), id.vars= c(1:4))$value)
+B=cbind(melt(cbind(measure=measure,rbind(n2o.means,n2o.se)),         id.vars= c(1:4))[,1:5],
+      n2o=melt(cbind(measure=measure,rbind(n2o.means,n2o.se)),     id.vars= c(1:4))$value,
+      co2=melt(cbind(measure=measure,rbind(co2.means,co2.se)),    id.vars= c(1:4))$value)
+
+C=A[1:32,]
+C[,6:7]=NA
+C[,5]=1
+A=rbind(C,A)
+fig2.extended=cbind(A,B[6:7])
+colnames(fig2.extended)[[5]] <- "day"
+fig2.extended$day <- as.integer(fig2.extended$day)
+fig2.x  <- melt(fig2.extended, id.vars= c(1:5)) 
+fig2.x  <- dcast(fig2.x, treat+soil+variable+day+experiment~measure) 
+fig2.x  <- fig2.x[order(fig2.x$experiment ),]
+fig2.x$variable <- revalue(fig2.x$variable, c(n2o="paste(N[2],O)~Production~Rate",co2= "paste(CO[2])~Production~Rate", n2o.cum="Cumulative~paste(N[2],O)", co2.cum="Cumulative~CO[2]"))
+fig2.x$variable <- factor(fig2.x$variable, levels=c("paste(N[2],O)~Production~Rate","Cumulative~paste(N[2],O)", "paste(CO[2])~Production~Rate","Cumulative~CO[2]"))
+
+txt.ylab = expression(paste(CO[2],"[?g ",CO[2],"-C ",kg^-1,"]",
+                                 "                      ",
+                                 #CO[2],"[?g ",CO[2],"-C ",kg^-1, h^-1,"]",
+                                 #"                   ",
+                                 N[2],"O [?g ",N[2],"O-N ",kg^-1,"]",
+                                 "                      ",
+                                 N[2],"O [?g ",N[2],"O-N ",kg^-1, h^-1,"]"))
+
+pd = position_dodge(0.2)
+ggplot(data=fig2.x[(fig2.x$experiment=="exp2" & !fig2.x$variable=="paste(CO[2])~Production~Rate"),], aes(x=day, y=mean, group=treat, shape=treat)) + 
+  geom_point(size=2.0, position=pd, fill="white") + 
+  geom_line (size=0.35, position=pd) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=4, size=0.2, position=pd) + 
+  xlab("Days [d]") +
+  ylab(txt.ylab) +
+  facet_grid(variable~soil, scales ="free", labeller=label_parsed) + 
+  scale_shape_manual(values=c(17,16,15,21), 
+                     labels=c("L. terrestris","F. candida", "Interaction","Control")) + 
+                     #limits=c("L. terrestris","F. candida","Interaction","Control")) +
+  labs(shape=" ") +
+  mytheme + theme(legend.position=c(0.57,0.9))
+
+## ggsave("Appendix A.pdf", width=19, height=15, units="cm", useDingbats=FALSE)
+```
+
+  
+  
+# Stable Isotopes 15N Gas 
+_______________________________________________________________________________________________________________
+#### Data formatting
+```{r 15N-Gas data formatting, echo=FALSE}
+str(gas15)
+gas15$date  <- as.POSIXlt(gas15$date)
+gas15$treat <- factor(gas15$treat, levels = c("Lt", "Fc", "LF", "C"))
+str(gas15)
+
+# subsets
+ident = gas15[,1:3]
+treatments = gas15[,8:13]
+time = gas15[,4:7]
+gas = gas15[,19:24]
+
+    # data frame with the 4 relevant variables nitox.pool, dinirogen, nitox, total
+    gas15.data = cbind(MK=gas15$MK, day=gas15$day, soil=gas15$soil, gas15[,c(9,10)], gas15[,20:24])
+
+#________________________________________________________________________________________________
+# color palette for treatment Graphics
+trt_pal = c("firebrick3", "dodgerblue2", "darkorchid", "dimgray")
+
+# y-Axis labels
+txt.total      = expression(paste("Total ", N[2],"O+",N[2]," [?g ",N[2],"(O)-N ",kg^-1, h^-1,"]"))
+txt.dinitrogen = expression(paste("Dinitrogen ", N[2]," [?g ",N[2],"-N ",kg^-1, h^-1,"]"))
+txt.ratio      = expression(paste("Product Ratio ", N[2],"O/",N[2],"+",N[2],"O"))
+txt.pool       = expression(paste("Plant derived ", N[2],"O","[%]"))
+txt.nitox      = expression(paste("Nitrous Oxide ", N[2],"O [?g ",N[2],"O-N ",kg^-1, h^-1,"]"))
+````
+  
+  
+### Data Exploration + Graphics
+#### dinitrogen, product ratio, nitrous oxide
+```{r Figure 3, echo=FALSE}
+##### Multi-Panel Lineplot with mean and standard error #####
+
+#**** create dataset with mean +standard error ****
+  
+  head1 = c("treat","day","soil", "total","product.ratio","nitox","dinitrogen","nitox.pool")
+  
+  # df for mean over time(day)
+  gas15.mean     = matrix(0,32,8)
+  gas15.mean[,1] =rep(c("Lt", "Fc", "LF", "C"),c(4,4,4,4))
+  gas15.mean[,2] =rep(c(19, 26, 33, 40),4)
+  gas15.mean[,3] =rep(c("Loam", "Sand"),c(16,16))
+  gas15.mean[,4] = with(gas15, tapply(total, list(day,treat,soil), mean))
+  gas15.mean[,5] = with(gas15, tapply(product.ratio, list(day,treat,soil), mean))
+  gas15.mean[,6] = with(gas15, tapply(nitox, list(day,treat,soil), mean))
+  gas15.mean[,7] = with(gas15, tapply(dinitrogen, list(day,treat,soil), mean))
+  gas15.mean[,8] = with(gas15, tapply(nitox.pool, list(day,treat,soil), mean))
+  colnames(gas15.mean) = head1
+  gas15.mean <- as.data.frame(gas15.mean)
+  str(gas15.mean)
+
+  # df for standard error over time(day)
+  gas15.se     = matrix(0,32,8)
+  gas15.se[,1] =rep(c("Lt", "Fc", "LF", "C"),c(4,4,4,4))
+  gas15.se[,2] =rep(c(19, 26, 33, 40),4)
+  gas15.se[,3] =rep(c("Loam", "Sand"),c(16,16))
+  gas15.se[,4] = with(gas15, tapply(total, list(day,treat,soil),se))
+  gas15.se[,5] = with(gas15, tapply(product.ratio, list(day,treat,soil),se))
+  gas15.se[,6] = with(gas15, tapply(nitox, list(day,treat,soil),se))
+  gas15.se[,7] = with(gas15, tapply(dinitrogen, list(day,treat,soil),se))
+  gas15.se[,8] = with(gas15, tapply(nitox.pool, list(day,treat,soil),se))
+  colnames(gas15.se) = head1
+  gas15.se <- as.data.frame(gas15.se)
+  
+#**** prepare dataframe for multi panel plot ****
+
+  gas15.mean.melt           <- melt(gas15.mean, id.vars= c(1:3), measure.vars=c(4:8)) 
+  gas15.se.melt             <- melt(gas15.se, id.vars = c(1:3)) 
+
+  ## combine mean and standard error in one dataframe
+  gas15.fig3           <- cbind(gas15.mean.melt[1:96,], gas15.se.melt[1:96,5])
+  colnames(gas15.fig3)[6] <- "se"
+
+  # Reorder Factor levels
+  gas15.fig3$variable  <- factor(gas15.fig3$variable, levels = c("total", "product.ratio", "nitox", "dinitrogen", "nitox.pool"))
+  gas15.fig3$treat     <- factor(gas15.fig3$treat, levels = c("Lt", "Fc", "LF", "C"))
+  # For facet.grid:
+  levels(gas15.fig3$variable)[levels(gas15.fig3$variable)=="total"] <- "paste(N[2],O)+N[2]"
+  levels(gas15.fig3$variable)[levels(gas15.fig3$variable)=="product.ratio"] <- "Product~Ratio"
+  levels(gas15.fig3$variable)[levels(gas15.fig3$variable)=="nitox"] <- "paste(N[2],O)"
+
+  # Coerce objects in required structure, 
+  # keep an eye on as.numeric(as.character()), for coercion from factor to numeric!!!
+  gas15.fig3$value     <- as.numeric(gas15.fig3$value)
+  gas15.fig3$se        <- as.numeric(as.character(gas15.fig3$se))
+  str(gas15.fig3)
+
+#**** Multi Panel Plot ****
+
+# Labels
+    txt.total = expression(paste(?g~Total-N~h^-1,kg^-1))
+    txt.ratio = expression(paste(N[2],O)/paste(N[2],O+N[2]))
+    txt.nitox = expression(paste(?g~paste(N[2],O)-N~h^-1,kg^-1))
+    txt.full  = expression(paste(paste(?g~paste(N[2],O)-N~kg^-1,h^-1),"       ",frac(paste(N[2],O),paste(N[2],O+N[2])),"        ",paste(?g~Total-N~kg^-1,h^-1)))
+
+
+pd=position_dodge(0.2)
+ggplot(data=gas15.fig3, aes(x=day, y=value, group=treat, shape=treat)) +
+  facet_grid(variable~soil, scales="free", labeller=label_parsed) +
+  #guides(colour=F, shape=F) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), size=0.25, width=.3, position=pd) + 
+  geom_line(size=0.3, position=pd) +
+  geom_point(size=2.0, position=pd, colour="black", fill="white") +
+  scale_shape_manual(values=c(17,16,15,21), labels=c("L. terrestris", "F. candida","Interaction","Control")) +
+  #scale_colour_manual(values=trt_pal) +
+  #scale_colour_grey(start=0, end=0.6) +
+  labs(shape="") +
+  xlab("Days [d]") +
+  ylab(txt.full) +
+  mytheme + theme(legend.position="bottom")                     
+
+## ggsave("Figure 2.pdf",  width=9, height=10.5, unit="cm", useDingbats=FALSE)   
+````
+
+#### litter-derived nitrous oxide 
+```{r Figure 4}
+
+#### create dataframe 
+# Mean values over MK
+  gas15.fig4 <- matrix(0,26,9)
+  gas15.fig4 <- as.data.frame(gas15.fig4)
+  gas15.fig4[,1] = gas15[1:26,1]
+  gas15.fig4[,2] = factor(rep(c("Lt", "LF", "Fc", "C"), c(4,3,3,3)),levels = c("Lt", "Fc", "LF", "C"))
+  gas15.fig4[,3] = factor(rep(c("Loam", "Sand"), c(13,13)))
+  gas15.fig4[,4] = with(gas15, round(tapply(nitox, MK, mean),3))
+  gas15.fig4[,5] = with(gas15, round(tapply(nitox.pool, MK, mean),3))
+  gas15.fig4[,6] = with(gas15, round(tapply(nitox.gc, MK, mean),3))
+  gas15.fig4[,7] = with(gas15, round(tapply(nitox, MK,se),3))
+  gas15.fig4[,8] = with(gas15, round(tapply(nitox.pool, MK,se),3))
+  gas15.fig4[,9] = with(gas15, round(tapply(nitox.gc, MK,se),3))
+  colnames(gas15.fig4) = head2 = c("MK","treat","soil","nitox.mean","nitox.pool.mean","nitox.gc.mean","nitox.se","nitox.pool.se", "nitox.gc.se")
+
+  # gas15.fig4$treat <- factor(gas15.fig4$treat, levels = c("Lt", "Fc", "LF", "C"))
+  gas15.fig4$Lter <- factor(rep(rep(c("+Lt", "-Lt"), c(7,6)),2))
+  gas15.fig4$col.fac <- interaction(gas15.fig4$soil, gas15.fig4$Lter, sep="")
+  str(gas15.fig4)
+  gas15.fig4 <- droplevels(gas15.fig4)   
+#### create Single Panel Plot with ellipse #
+
+# Color palettes
+LtSoil_pal=c("gray8", "gray30", "gray48", "gray70")
+LtSoil_pal2=c("darkseagreen", "burlywood", "darkolivegreen3", "darkgoldenrod1")
+title = expression(paste("Plant derived ",N[2],"O depending on soiltype and presence of L. terrestris"))
+
+# Ellipse Building
+# Script from http://stackoverflow.com/questions/13794419/plotting-ordiellipse-function-from-vegan-package-onto-nmds-plot-created-in-ggplo
+
+# For annotation
+ellipse.mean=with(gas15.fig4, aggregate(gas15.fig4[,c(4,5)],list(group=col.fac),mean))
+
+# Special function 
+veganCovEllipse <- function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+{
+  theta <- (0:npoints) * 2 * pi/npoints
+  Circle <- cbind(cos(theta), sin(theta))
+  t(center + scale * t(Circle %*% chol(cov)))
+}
+
+# Data frame df_ell contains values to show ellipses. 
+# It is calculated with function veganCovEllipse which is hidden in vegan package. 
+# This function is applied to each level of NMDS (group) and 
+# it uses also function cov.wt to calculate covariance matrix.
+
+df_ell <- data.frame()
+for(g in levels(gas15.fig4$col.fac)){
+  df_ell <- rbind(df_ell, cbind(as.data.frame(with(gas15.fig4[gas15.fig4$col.fac==g,],
+                                                   veganCovEllipse(cov.wt(cbind(nitox.mean,nitox.pool.mean),wt=rep(1/length(nitox.mean),length(nitox.mean)))$cov,center=c(mean(nitox.mean),mean(nitox.pool.mean)))))
+                                ,group=g))
+}
+#________________________________________________________________________________________________________
+# plot #
+#Labels
+txt.pool = expression(paste("Plant derived ", N[2],"O"," [%]"))
+txt.nitox = expression(paste(N[2],"O"[litter]," [?g ",N[2],"O-N ",kg^-1, h^-1,"]"))
+
+p4 = ggplot(data=gas15.fig4, aes(x=nitox.mean, y=nitox.pool.mean)) +
+  #guides(colour=F, shape=F) +
+  geom_point(aes(colour=col.fac, shape=treat), size=2.0) +
+  geom_path(data=df_ell, aes(x=nitox.mean, y=nitox.pool.mean, colour=group), size=0.5, linetype=2) +
+  annotate("text",x=ellipse.mean$nitox.mean+0.1,y=ellipse.mean$nitox.pool.mean,label=ellipse.mean$group, size=2.5) +
+  scale_shape_manual(values=c(17,16,15,21)) +
+  scale_colour_manual(values=LtSoil_pal) +
+  scale_y_continuous(limits=c(0,1)) +
+  ylab(txt.pool) +
+  xlab(txt.nitox)
+p4 + mytheme +theme(legend.position="none" )
+        
+# ggsave("Figure 4.pdf", width=9, height=7, units="cm", useDingbats=FALSE)
+# ggsave("Figure 4.svg", width=9, height=7, units="cm")
+```
+
+For nitox.gc
+```{r}
+#### create dataframe 
+# Mean values over MK
+gas15.fig4 <- matrix(0,26,9)
+gas15.fig4 <- as.data.frame(gas15.fig4)
+gas15.fig4[,1] = gas15[1:26,1]
+gas15.fig4[,2] = factor(rep(c("Lt", "LF", "Fc", "C"), c(4,3,3,3)),levels = c("Lt", "Fc", "LF", "C"))
+gas15.fig4[,3] = factor(rep(c("Loam", "Sand"), c(13,13)))
+gas15.fig4[,4] = with(gas15, round(tapply(nitox, MK, mean),3))
+gas15.fig4[,5] = with(gas15, round(tapply(nitox.pool, MK, mean),3))
+gas15.fig4[,6] = with(gas15, round(tapply(nitox.gc, MK, mean),3))
+gas15.fig4[,7] = with(gas15, round(tapply(nitox, MK,se),3))
+gas15.fig4[,8] = with(gas15, round(tapply(nitox.pool, MK,se),3))
+gas15.fig4[,9] = with(gas15, round(tapply(nitox.gc, MK,se),3))
+colnames(gas15.fig4) = head2 = c("MK","treat","soil","nitox.mean","nitox.pool.mean","nitox.gc.mean","nitox.se","nitox.pool.se", "nitox.gc.se")
+
+# gas15.fig4$treat <- factor(gas15.fig4$treat, levels = c("Lt", "Fc", "LF", "C"))
+gas15.fig4$Lter <- factor(rep(rep(c("+Lt", "-Lt"), c(7,6)),2))
+gas15.fig4$col.fac <- interaction(gas15.fig4$soil, gas15.fig4$Lter, sep="")
+str(gas15.fig4)
+gas15.fig4 <- droplevels(gas15.fig4)   
+#### create Single Panel Plot with ellipse #
+
+# Color palettes
+LtSoil_pal=c("gray8", "gray30", "gray48", "gray70")
+LtSoil_pal2=c("darkseagreen", "burlywood", "darkolivegreen3", "darkgoldenrod1")
+title = expression(paste("Plant derived ",N[2],"O depending on soiltype and presence of L. terrestris"))
+
+
+# For annotation
+ellipse.mean=with(gas15.fig4, aggregate(gas15.fig4[,c(6,5)],list(group=col.fac),mean))
+
+# Special function 
+veganCovEllipse <- function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+{
+  theta <- (0:npoints) * 2 * pi/npoints
+  Circle <- cbind(cos(theta), sin(theta))
+  t(center + scale * t(Circle %*% chol(cov)))
+}
+
+df_ell <- data.frame()
+for(g in levels(gas15.fig4$col.fac)){
+  df_ell <- rbind(df_ell, cbind(as.data.frame(with(gas15.fig4[gas15.fig4$col.fac==g,],
+                                                   veganCovEllipse(cov.wt(cbind(nitox.gc.mean,nitox.pool.mean),wt=rep(1/length(nitox.gc.mean),length(nitox.gc.mean)))$cov,center=c(mean(nitox.gc.mean),mean(nitox.pool.mean)))))
+                                ,group=g))
+}
+
+txt.pool = expression(paste("Plant derived ", N[2],"O","[%]"))
+txt.nitox = expression(paste("Nitrous Oxide ", N[2],"O [?g ",N[2],"O-N ",kg^-1, h^-1,"]"))
+
+p4 = ggplot(data=gas15.fig4, aes(x=nitox.gc.mean, y=nitox.pool.mean)) +
+  #guides(colour=F, shape=F) +
+  geom_point(aes(colour=col.fac, shape=treat), size=1.5) +
+  geom_path(data=df_ell, aes(x=nitox.gc.mean, y=nitox.pool.mean, colour=group), size=0.5, linetype=2) +
+  annotate("text",x=ellipse.mean$nitox.gc.mean+0.1,y=ellipse.mean$nitox.pool.mean,label=ellipse.mean$group, size=2.5) +
+  scale_shape_manual(values=c(17,16,15,21)) +
+  scale_colour_manual(values=LtSoil_pal) +
+  scale_y_continuous(limits=c(0,1)) +
+  ylab(txt.pool) +
+  xlab(txt.nitox)
+p4 + mytheme +theme(legend.position=c(0.08,0.75) )
+```
+
+
+All Incubation measures [AIM]
+Data frame with litter derived -N2, -N2O, -N2+N2O, -N2O + soil derived N2O, N2 + total N2O, percentage, product ratio N2/litter N2O, N2/total N2O
+
+```{r}
+AIM <- data.frame(gas15[,1:13],
+                      litd.dinitrogen=gas15$dinitrogen,
+                       litd.nitox=gas15$nitox,
+                       litd.total=gas15$dinitrogen+gas15$nitox,
+                       total.nitox=gas15$nitox.gc,
+                       total.Ngas=gas15$nitox.gc+gas15$dinitrogen,
+                       nitox.pool=gas15$nitox.pool,
+                       litd.product.ratio=gas15$product.ratio,
+                       product.ratio=gas15$nitox.gc/(gas15$dinitrogen+gas15$nitox.gc),
+                       iso.enrichment=gas15$nitox.atperc)
+# A: ?ber die Zeit mitteln, dann ?ber treatments mitteln
+AIM.mean <-  data.frame(cbind(unique(gas15.2[,-c(1,4:7,14:22)]),aggregate(gas15.2[,14:22], list(MK=MK), mean)))
+AIM.treat <- aggregate(AIM.mean, list(treat=AIM.mean$treat, soil=AIM.mean$soil), mean)
+# B: ?ber die Zeit kumulieren, dann ?ber treatments mitteln
+AIM.cum <- data.frame(AIM.mean, 
+                      ltd.total.cum=gas15.cum$total[1:26],
+                      ltd.nitox.cum=gas15.cum$nitox[1:26],
+                      ltd.dinitrogen.cum=gas15.cum$dinitrogen[1:26],
+                      total.nitox.cum=gas15.cum$nitox.gc[1:26],
+                      total.cum=gas15.cum$dinitrogen[1:26]+gas15.cum$nitox.gc[1:26])
+AIM.cum.treat <- aggregate(AIM.cum, list(treat=AIM.cum$treat, soil=AIM.cum$soil), mean)
+
+A.data=AIM.cum[AIM.cum$soil=="Sand",]
+
+t.test(ltd.total.cum~Lt,A.data) # n.s.
+t.test(litd.total~Lt,A.data) # n.s.
+t.test(total.nitox~Lt,A.data) 
+t.test(total.nitox.cum~Lt,A.data) 
+AIM.cum.aov2 <- aov(log(total.nitox.cum)~Lt*soil,AIM.cum)
+AIM.cum.aov1 <- aov(litd.nitox~Lt*soil,AIM.cum)
+
+TukeyHSD(AIM.cum.aov1)
+TukeyHSD(AIM.cum.aov2)
+
+ggplot(AIM.cum, aes(x= Lt, y=total.nitox.cum),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("total.nitox.cum"))) +
+  xlab("L.~terrestris") +
+  facet_grid(.~soil, labeller=label_parsed) + 
+  mytheme
+
+ggplot(AIM.cum, aes(x= Lt, y=ltd.nitox.cum),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("litd.nitox"))) +
+  xlab("L.~terrestris") +
+  facet_grid(.~soil, labeller=label_parsed) + 
+  mytheme
+
+```
+
+
+
+#### Cumulative N2O, N2, Total
+```{r}
+# Cumulative gas between two dates
+cumulative = function (x) 168*(x[i:(length(x)-j)]+0.5*(x[(i+j):length(x)]-x[i:(length(x)-j)]))
+
+gas15.cum = matrix(0,78,4)
+i=1
+j=26
+a = cumulative(gas15$total)
+b = cumulative(gas15$dinitrogen)
+c = cumulative(gas15$nitox)
+d = cumulative(gas15$nitox.gc)
+
+# summed up for up to last date
+cumulative2 = function(x) x[i:j]+x[(i+26):(j+26)]+x[(i+26+26):(j+26+26)]
+gas15.cum[,1] = a = cumulative2(a)
+gas15.cum[,2] = b = cumulative2(b)
+gas15.cum[,3] = c = cumulative2(c)
+gas15.cum[,4] = d = cumulative2(d)
+colnames(gas15.cum) = colnames(gas15[,c(22:24,14)])
+
+# data frame for analysis 
+gas15.cum = cbind(gas15[1:26,1:3],gas15[1:26,8:13], gas15.cum)
+str(gas15.cum)
+
+# write.table(gas15.cum, "gas15_cumR.txt", dec=".", sep=";", row.names=F)
+
+
+# Second dataframe for standard error
+cumulative = function (x) 168*(x[i:(length(x)-j)]+0.5*(x[(i+j):length(x)]-x[i:(length(x)-j)]))
+gas15.cum2 = matrix(0,78,4)
+i=1
+j=26
+gas15.cum2[,1] = a = cumulative(gas15$total)
+gas15.cum2[,2] = b = cumulative(gas15$dinitrogen)
+gas15.cum2[,3] = c = cumulative(gas15$nitox)
+gas15.cum2[,4] = d = cumulative(gas15$nitox.gc)
+colnames(gas15.cum2) = colnames(gas15[,c(22:24,14)])
+gas15.cum3 = gas15.cum2
+gas15.cum3 = as.data.frame(gas15.cum3, stringsAsFactor=F)
+str(gas15.cum3)
+
+for (j in 1:4)  {
+  for (i in 27:78) {
+    gas15.cum2[i,j] =  gas15.cum2[i,j] + gas15.cum2[i-26,j]
+  }
+}
+
+gas15.cum2 = cbind(gas15[27:104,1:13], gas15.cum2)
+gas15.cum2$treat = factor(gas15.cum2$treat, level=c("Lt","Fc","LF","C"))
+str(gas15.cum2)
+# gas_cum_test= gas15.cum2[gas15.cum2$day == 40,]
+
+
+# df for mean over time(day)
+gas15.cum2.mean   = matrix(0,24,7)
+gas15.cum2.mean[,1] = rep(c("Lt", "Fc", "LF", "C"),c(3,3,3,3))
+gas15.cum2.mean[,2] = rep(c(26, 33, 40),4)
+gas15.cum2.mean[,3] = rep(c("Loam", "Sand"),c(12,12))
+gas15.cum2.mean[,4] = with(gas15.cum2, tapply(total, list(day,treat,soil), mean))
+gas15.cum2.mean[,5] = with(gas15.cum2, tapply(nitox, list(day,treat,soil), mean))
+gas15.cum2.mean[,6] = with(gas15.cum2, tapply(dinitrogen, list(day,treat,soil), mean))
+gas15.cum2.mean[,7] = with(gas15.cum2, tapply(nitox.gc, list(day,treat,soil), mean))
+colnames(gas15.cum2.mean) = c("treat","day","soil","total.mean","nitox.mean","dinitrogen.mean", "nitox.gc.mean")
+gas15.cum2.mean <- as.data.frame(gas15.cum2.mean, stringsAsFactors=F)
+str(gas15.cum2.mean)
+
+
+# df for standard error over time(day)
+gas15.cum2.se     = matrix(0,24,7)
+gas15.cum2.se[,1] = rep(c("Lt", "Fc", "LF", "C"),c(3,3,3,3))
+gas15.cum2.se[,2] = rep(c(26, 33, 40),4)
+gas15.cum2.se[,3] = rep(c("Loam", "Sand"),c(12,12))
+gas15.cum2.se[,4] = with(gas15.cum2, tapply(total, list(day,treat,soil), se))
+gas15.cum2.se[,5] = with(gas15.cum2, tapply(nitox, list(day,treat,soil), se))
+gas15.cum2.se[,6] = with(gas15.cum2, tapply(dinitrogen, list(day,treat,soil), se))
+gas15.cum2.se[,7] = with(gas15.cum2, tapply(nitox.gc, list(day,treat,soil), se))
+colnames(gas15.cum2.se) = c("treat","day","soil","total.se","nitox.se","dinitrogen.se","nitox.gc.se")
+gas15.cum2.se <- as.data.frame(gas15.cum2.se, stringsAsFactors=F)
+str(gas15.cum2.se)
+
+# Formel f?r Fehler durch Fehlerfortpflanzung: function (x) sqrt(sum((Kum_StdF[i,1:j])^2
+gas15.cum2.se <- melt(gas15.cum2.se, id.vars= c(1:3))
+gas15.cum2.se$treat = factor(gas15.cum2.se$treat, level=c("Lt","Fc","LF","C"))
+gas15.cum2.se <- dcast(gas15.cum2.se, variable + soil + treat ~ day)
+colnames(gas15.cum2.se) [1] = "gas"
+gas15.cum2.se.ts <- as.data.frame(lapply(gas15.cum2.se[,4:6], as.numeric))
+
+for (i in 1:24)  {
+  for (j in 1:3) {
+    a=sqrt(sum((gas15.cum2.se.ts[i,1:j])^2))
+             gas15.cum2.se.ts[i,j]=a
+  }
+}
+
+gas15.cum2.se.ts <- melt(cbind(gas15.cum2.se[,1:3], gas15.cum2.se.ts), id.vars=c(1:3))
+gas15.cum2.se.ts <- dcast(gas15.cum2.se.ts, soil+treat+variable~gas)
+gas15.cum2.meanse <- cbind(gas15.cum2.mean, gas15.cum2.se.ts[,4:7])
+
+# write.table(gas15.cum2.meanse, "gas15_cum2_meanse.txt", dec=".", sep=";", row.names=F)
+
+
+# Multipanel Line Plot
+txt.full  = expression(paste( ,"",paste(?g~N[2]-N~kg^-1),"       ",paste(?g~paste(N[2],O)-N~kg^-1),"        ",paste(?g~Total-N~kg^-1),"  ",paste(?g~total~paste(N[2],O)-N~kg^-1)))
+
+helpframe1 = melt(gas15.cum2.meanse, id.vars=c(1:3), measure.vars=c(4:7), variable.name="mean.fac", value.name="mean")
+helpframe2 = melt(gas15.cum2.meanse, id.vars=c(1:3), measure.vars=c(8:11), variable.name="se.fac", value.name="se")
+gas15.cum2.meanse.plot <- cbind(helpframe1,helpframe2[,c(4,5)])
+gas15.cum2.meanse.plot$treat = factor(gas15.cum2.meanse.plot$treat, levels=c("Lt","Fc","LF","C"))
+gas15.cum2.meanse.plot$mean = as.numeric(gas15.cum2.meanse.plot$mean)
+str(gas15.cum2.meanse.plot)
+
+gas15.cum2.meanse.plot$mean.fac = revalue(gas15.cum2.meanse.plot$mean.fac, c(total.mean="paste(N[2],O)+N[2]", nitox.mean="paste(N[2],O)", dinitrogen.mean="N[2]",nitox.gc.mean="paste(total~N[2],O)"))
+
+pd=position_dodge(0.2)
+ggplot(data=gas15.cum2.meanse.plot, aes(x=day, y=mean, group=treat, shape=treat)) +
+  facet_grid(mean.fac~soil, scales="free", labeller=label_parsed) +
+  #guides(colour=F, shape=F) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), size=0.25, width=.3, position=pd) + 
+  geom_line(size=0.3, position=pd) +
+  geom_point(size=1.5, position=pd, colour="black", fill="white") +
+  scale_shape_manual(values=c(17,16,15,21), labels=c("L. terrestris", "F. candida","Interaction","Control")) +
+  #scale_colour_manual(values=trt_pal) +
+  #scale_colour_grey(start=0, end=0.6) +
+  labs(shape="") +
+  xlab("Days [d]") +
+  ylab(txt.full) +
+  mytheme + theme(legend.position="bottom") 
+```
+
+### Analysis
+```{r Analysis5}
+# The data
+gas15.data <- cbind(gas15.cum, product.ratio=as.numeric(with(gas15.data, tapply(product.ratio,MK,mean))),
+                    nitox.pool=as.numeric(with(gas15, tapply(nitox.pool,MK,mean))))
+gas15.data2 <- gas15.data[!(gas15.data$soil=="Loam"&gas15.data$Lt=="n"),]
+str(gas15.data)
+
+###### product ratio
+hist(gas15.data$product.ratio)
+
+ggplot(gas15.data, aes(x= Lt, y=product.ratio),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("product ratio"))) +
+  xlab("italic(L.~terrestris)") +
+  ggtitle(expression(paste("Product Ratio"))) +
+  facet_grid(~soil, labeller=label_parsed) + 
+  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+  mytheme
+
+# ANOVA without transformation
+    gas15.pr.aov <- aov(product.ratio~soil*Lt*Fc, gas15.data); summary(gas15.pr.aov)
+    TukeyHSD(gas15.pr.aov)
+
+# ANOVA with Arcsine transformation
+    gas15.pr.aov <- aov(asin(sqrt(product.ratio))*180/pi~soil*Lt*Fc, gas15.data); summary(gas15.pr.aov)
+    # validation plot
+    par(mfrow=c(2,2))
+    par(mar=c(3,3,3,3))
+    plot(gas15.pr.aov)
+    
+    fligner.test(asin(sqrt(product.ratio))*180/pi~soil*Lt*Fc, gas15.data)
+    with(gas15.data, shapiro.test(asin(sqrt(product.ratio))*180/pi))# if this Test is significant, the data is significantly different from Normal sitribution and the ANOVA assumption is violated
+
+
+# ANOVA with model simplification
+    gas15.pr.aov <- update(gas15.pr.aov, .~soil*Lt);summary(gas15.pr.aov)
+    # validation plot
+    par(mfrow=c(2,2))
+    plot(gas15.pr.aov)
+    
+    fligner.test(asin(sqrt(product.ratio))*180/pi~interaction(soil,Lt), gas15.data)
+
+# Post Hoc Tukey Test
+                prodr.int <- with(gas15.data, interaction(soil,Lt)) # Double interaction factor
+                gas15.pr.aov2 <- aov(product.ratio~prodr.int, data=gas15.data)
+                HSD.test(gas15.pr.aov2, "prodr.int", group=TRUE, console=TRUE) 
+                pr.tuk1 <- glht(gas15.pr.aov2, linfct = mcp(prodr.int = "Tukey"))
+                summary(pr.tuk1)          # standard display
+                pr.tuk.cld <- cld(pr.tuk1)   # letter-based display
+                par(mai=c(1,1,1.1,0.2),  # mai specifies margin size in inches
+                    mfrow=c(1,1),
+                    mgp=c(2,1,0),
+                    cex=0.8) 
+                plot(pr.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
+                axis(1, at=pr.int,labels=FALSE)
+                text(pr.int, labels=pr.int, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+ 
+gas15.pr.aov3 <- aov(asin(sqrt(product.ratio))*180/pi~soil*Lt,gas15.data2);summary(gas15.pr.aov3)
+par(mfrow=c(2,2))
+plot(gas15.pr.aov3)
+# Leaving out Loamy treatments without L. terrestris because their emissions have almost ambient air concentration, shows significant effect of sandy soil.
+
+ggplot(gas15.data, aes(x= Lt, y=product.ratio),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("product ratio"))) +
+  xlab("italic(L.~terrestris)") +
+  ggtitle(expression(paste("Product Ratio"))) +
+  facet_grid(~soil, labeller=label_parsed) + 
+  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+  mytheme
+
+ggplot(gas15.data, aes(x= soil, y=product.ratio),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("product ratio"))) +
+  xlab("Soil") +
+  ggtitle(expression(paste("Product Ratio"))) +
+  facet_grid(~Lt, labeller=label_parsed) + 
+  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("Loam","Sand")) +
+  mytheme
+
+with(gas15.data, round(tapply(product.ratio,interaction(Lt,soil), mean),2))
+with(gas15.data, round(tapply(product.ratio,interaction(Lt,soil), se),2))
+
+#### Nitrous Oxide
+
+gas15.nx.aov <- aov(nitox~soil*Lt*Fc, gas15.data); summary(gas15.nx.aov)
+
+par(mfrow=c(2,2))
+par(mar=c(3,3,3,3))
+plot(gas15.nx.aov)
+
+gas15.nx.aov <- aov(log1p(nitox)~soil*Lt*Fc, gas15.data); summary(gas15.nx.aov)
+gas15.nx.aov <- update(gas15.nx.aov,.~soil*Lt, gas15.data); summary(gas15.nx.aov)
+
+fligner.test(log1p(nitox)~interaction(soil,Lt), gas15.data)
+TukeyHSD(gas15.nx.aov)
+
+# Post Hoc Tukey Test
+                nx.int <- with(gas15.data, interaction(soil,Lt)) # Double interaction factor
+                gas15.nx.aov2 <- update(gas15.nx.aov, .~ nx.int)
+                HSD.test(gas15.nx.aov2, "nx.int", group=TRUE, console=TRUE) 
+                nx.tuk1 <- glht(gas15.nx.aov2, linfct = mcp(nx.int = "Tukey"))
+                summary(nx.tuk1)          # standard display
+                nx.tuk.cld <- cld(nx.tuk1)   # letter-based display
+                par(mai=c(1,1,1.1,0.2),  # mai specifies margin size in inches
+                    mfrow=c(1,1),
+                    mgp=c(2,1,0),
+                    cex=0.8) 
+                plot(nx.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
+                axis(1, at=nx.int,labels=FALSE)
+                text(nx.int, labels=nx.int, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+
+with(gas15.data, list( tapply(nitox, list(Lt,soil), mean),
+                        tapply(nitox, list(Lt,soil), se)))
+
+
+gas15.nx.aov <- aov(log1p(nitox)~soil*Lt, gas15.data2); summary(gas15.nx.aov)
+with(gas15.data2[(gas15.data2$Lt=="y"),], t.test(log1p(nitox)~soil, alternative="less"))
+
+expm1(4.791717)
+expm1(5.335476)
+expm1(4.791717)-expm1(5.335476)
+with(gas15.data, list( tapply(nitox, soil, mean),
+                        tapply(nitox, soil, se)))
+
+# Dinitrogen
+
+ggplot(gas15.data, aes(x= Lt, y=dinitrogen),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("product ratio"))) +
+  xlab("italic(L.~terrestris)") +
+  ggtitle(expression(paste("Product Ratio"))) +
+  facet_grid(~soil, labeller=label_parsed) + 
+  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+  mytheme
+
+ggplot(gas15.data, aes(x= soil, y=dinitrogen),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(expression(paste("product ratio"))) +
+  xlab("Soil") +
+  ggtitle(expression(paste("Product Ratio"))) +
+  facet_grid(~Lt, labeller=label_parsed) + 
+  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("Loam","Sand")) +
+  mytheme
+
+gas15.dn.aov <- aov(dinitrogen~soil*Lt*Fc, gas15.data); summary(gas15.dn.aov)
+
+par(mfrow=c(2,2))
+par(mar=c(3,3,3,3))
+plot(gas15.dn.aov)
+
+gas15.dn.aov <- aov(log1p(dinitrogen)~soil*Lt*Fc, gas15.data); summary(gas15.dn.aov)
+gas15.dn.aov <- update(gas15.dn.aov,.~soil*Lt, gas15.data); summary(gas15.dn.aov)
+
+par(mfrow=c(2,2))
+par(mar=c(3,3,3,3))
+plot(gas15.dn.aov)
+
+TukeyHSD(gas15.dn.aov)
+
+gas15.dn.aov <- aov(log1p(dinitrogen)~soil*Lt, gas15.data2); summary(gas15.dn.aov)
+with(gas15.data2[(gas15.data2$Lt=="y"),], t.test(log1p(dinitrogen)~soil, alternative="less"))
+
+with(gas15.data, list( tapply(dinitrogen, soil, mean),
+                        tapply(dinitrogen, soil, se)))
+
+with(gas15.data, list( tapply(dinitrogen, list(soil,Lt), mean),
+                        tapply(dinitrogen, list(soil,Lt), se)))
+
+
+# litter-derived N2O
+gas15.np.aov <- aov(nitox.pool~soil*Lt*Fc, gas15.data); summary(gas15.np.aov)
+
+par(mfrow=c(2,2))
+par(mar=c(3,3,3,3))
+plot(gas15.np.aov)
+
+gas15.np.aov <- aov(asin(sqrt(nitox.pool))*180/pi~soil*Lt*Fc, gas15.data); summary(gas15.np.aov)
+gas15.np.aov <- update(gas15.np.aov,.~soil*Lt, gas15.data); summary(gas15.np.aov)
+
+fligner.test(log1p(nitox.pool)~interaction(soil,Lt), gas15.data)
+TukeyHSD(gas15.np.aov)
+
+with(gas15.data, list( tapply(nitox.pool, list(soil,Lt), mean),
+                        tapply(nitox.pool, list(soil,Lt), se)))
+
+```
+
+# Extrapolation of product ratio
+```{r product ratio extrapolation}
+str(gas15)
+gas15$day <- as.numeric(gas15$day)
+
+# For all together
+pr.glm <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15)
+summary(pr.glm)
+
+par(mfrow=c(1,1))
+with(gas15, plot(day, product.ratio))
+     lines(gas15$day, pr.glm$fitted, type="l", col="red")
+day=c(1,3,5,7,11,15,18,21,25,28,32,35,39,42,48)
+day <- data.frame(day=day)
+ x <- data.frame(predict(pr.glm, newdata = day , type = "response"))
+str(day)
+
+plot(cbind(day,x))
+
+# for treat x soil
+pr.glm1 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="Lt" & gas15$soil=="Loam"),])
+
+pr.glm2 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="Fc" & gas15$soil=="Loam"),])
+
+pr.glm3 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="LF" & gas15$soil=="Loam"),])
+
+pr.glm4 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="C" & gas15$soil=="Loam"),])
+
+pr.glm5 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="Lt" & gas15$soil=="Sand"),])
+
+pr.glm6 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="Fc" & gas15$soil=="Sand"),])
+
+pr.glm7 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="LF" & gas15$soil=="Sand"),])
+
+pr.glm8 <- glm(cbind(nitox,nitox+dinitrogen) ~ day, family=binomial(logit),gas15[(gas15$treat=="C" & gas15$soil=="Sand"),])
+
+pr.expol <- matrix(0,15,8)
+pr.expol[,1] <- predict(pr.glm1, newdata=day,type = "response")
+pr.expol[,2] <- predict(pr.glm2, newdata=day,type = "response")
+pr.expol[,3] <- predict(pr.glm3, newdata=day,type = "response")
+pr.expol[,4] <- predict(pr.glm4, newdata=day,type = "response")
+pr.expol[,5] <- predict(pr.glm5, newdata=day,type = "response")
+pr.expol[,6] <- predict(pr.glm6, newdata=day,type = "response")
+pr.expol[,7] <- predict(pr.glm7, newdata=day,type = "response")
+pr.expol[,8] <- predict(pr.glm8, newdata=day,type = "response")
+
+colnames(pr.expol) <- c("Lt.Loam", "Fc.Loam", "Int.Loam", "C.Loam","Lt.Sand", "Fc.Sand", "Int.Sand", "C.Sand")
+
+
+pr.expol <- data.frame(cbind(day,pr.expol))
+pr.expol <- melt(pr.expol, id.vars=1)
+
+pr.expol <-  concat.split.multiple(pr.expol, "variable", ".")
+
+ggplot(pr.expol, aes(x=day,y=value)) + 
+  geom_point(aes(colour=variable_1)) +
+  facet_grid(~variable_2) + mytheme
+
+colnames(n2o.means)[c(4:18)] <- c(1,3,5,7,11,15,18,21,25,28,32,35,39,42,48)
+
+n2o.means.expol <- n2o.means[(n2o.means$experiment=="exp1"),]
+n2o.means.expol <- melt(n2o.means.expol, id.vars=1:3)
+n2o.means.expol$treat <- factor(n2o.means.expol$treat, levels=c("Lt","Fc","int","C"))
+n2o.means.expol <- n2o.means.expol[with(n2o.means.expol, order(soil,treat)), ]
+
+n2o.means.expol <- cbind(n2o.means.expol,pr.expol=pr.expol$value)
+colnames(n2o.means.expol)[5] <- "nitox"
+n2o.means.expol$total.x <- with(n2o.means.expol, nitox/pr.expol)
+
+total.expol <- n2o.means.expol[,c(1,2,4,7)]
+total.expol <- dcast(total.expol, treat+soil~variable)
+total.expol <- total.expol[with(total.expol, order(soil,treat)),]
+str(total.expol)
+
+code <- total.expol[,c(1,2)]
+total.expol <- total.expol[,-c(1,2)]
+
+days=c(1,3,5,7,11,15,18,21,25,28,32,35,39,42,48)
+
+ttx.rz=rbind(days,total.expol)
+
+#ttx between two sampling dates
+ttx.btw=matrix(rep(0,112),8)
+for (i in 2:9)
+{for (j in 1:14)
+{Zeit=(ttx.rz[1,(j+1)]-ttx.rz[1,j])*24  #*24da Zeit d in std umgerechnet werden muss
+ a=Zeit*ttx.rz[i,j]+0.5*Zeit*(ttx.rz[i,(j+1)]-ttx.rz[i,j])
+ ttx.btw[(i-1),j]=a
+}
+}
+
+# cumulative ttx for all samples
+ttx.cum=matrix(rep(0,112),8)
+for (i in 1:8) {
+  for (j in 1:14) {
+    a=sum(ttx.btw[i,1:j])
+    ttx.cum[i,j]=a    
+  }  
+}
+
+colnames(ttx.cum)<-days[-1]
+ttx.cum <- cbind(code,ttx.cum)
+ttx.cum <- melt(ttx.cum, id.vars=1:2)
+
+ttx.cum2 <- subset(ttx.cum, !(treat %in% c("C","Fc") & soil %in% "Loam"))
+pd = position_dodge(0.2)
+ggplot(ttx.cum2, aes(x=variable, y=value, group=treat, shape=treat)) +
+  facet_grid(~soil, scales="free", labeller=label_parsed) +
+  geom_line(size=0.3, position=pd) +
+  geom_point(size=1.5, position=pd, colour="black", fill="white") +
+  scale_shape_manual(values=c(17,16,15,21), labels=c("L. terrestris", "F. candida","Interaction","Control")) +
+  #scale_colour_manual(values=trt_pal) +
+  #scale_colour_grey(start=0, end=0.6) +
+  labs(shape="") +
+  xlab("Days [d]") +
+  ylab("total N extrapolated") +
+  mytheme + theme(legend.position="bottom")  
+
+
+ttx.pr <- n2o.means.expol[,c(1,2,3,4,5,6)]
+ttx.pr <- ttx.pr[with(ttx.pr, order(variable,soil,treat)),]
+
+ttx.cum <- rbind(cbind(ttx.pr[1:8,c(1,2)], variable=ttx.pr[1:8,4],value=rep(NA,8)),ttx.cum)
+ttx.cum <- cbind(ttx.cum,nitox=ttx.pr$nitox, pr.expol=ttx.pr$pr.expol)
+ttx.cum <- melt(ttx.cum, id.vars=1:3)
+colnames(ttx.cum) <- c("treat", "soil", "day", "variable", "value")
+ttx.cum$variable <- revalue(ttx.cum$variable, c(value="ttx") )
+ttx.cum$variable <- factor(ttx.cum$variable, levels=c("nitox","pr.expol","ttx") )
+
+pd = position_dodge(0.2)
+ggplot(ttx.cum, aes(x=day, y=value, group=treat, shape=treat)) +
+  facet_grid(variable~soil, scales="free", labeller=label_parsed) +
+  geom_line(size=0.3, position=pd) +
+  geom_point(size=1.5, position=pd, colour="black", fill="white") +
+  scale_shape_manual(values=c(17,16,15,21), labels=c("L. terrestris", "F. candida","Interaction","Control")) +
+  #scale_colour_manual(values=trt_pal) +
+  #scale_colour_grey(start=0, end=0.6) +
+  labs(shape="") +
+  xlab("Days [d]") +
+  ylab("total N extrapolated") +
+  mytheme + theme(legend.position="bottom")  
+
+ttx.cum2 <- subset(ttx.cum, !(treat %in% c("C","Fc") & soil %in% "Loam"))
+
+pd = position_dodge(0.2)
+ggplot(ttx.cum2, aes(x=day, y=value, group=treat, shape=treat)) +
+  facet_grid(variable~soil, scales="free", labeller=label_parsed) +
+  geom_line(size=0.3, position=pd) +
+  geom_point(size=1.5, position=pd, colour="black", fill="white") +
+  scale_shape_manual(values=c(17,16,15,21), labels=c("L. terrestris", "F. candida","Interaction","Control")) +
+  #scale_colour_manual(values=trt_pal) +
+  #scale_colour_grey(start=0, end=0.6) +
+  labs(shape="") +
+  xlab("Days [d]") +
+  ylab("total N extrapolated") +
+  mytheme + theme(legend.position="bottom")
+
+#write.table(ttx.cum[(ttx.cum$day==48&ttx.cum$variable=="ttx"),],"ttx.cum.csv", sep=";")
+
+```
+
+wieviel N aus dem Pflanzenmaterial ging verloren?
+wieviel h?her war N2 im vergleich zu n2o? Faktoren
+
+# Isotopomers
+```{r Isotopomers}
+
+isom.data.600 <- with(isom.data.all, isom.data.all[N2O.conc > 600,])
+isom.data.600$treat <- factor(isom.data.600$treat, levels=c("Lt", "Fc", "Int", "Control")) 
+
+with(isom.data.all, plot(d18o,sp))
+with(isom.data.600, plot(d18o,sp))
+col=soil, fill=as.factor(Sampleset)),
+
+ggplot(isom.data.600, aes(x=d18o, y=sp, shape=treat),  labeler=label_parsed) +
+  #geom_point(aes(x=d18o, y=sp),size=1.6, lwd=0.01,col="black", shape=16, isom.data.600[(isom.data.600$soil=="Loam"),]) +
+  geom_point(aes(x=d18o, y=sp),size=1.4, lwd=0.01,col="white", shape=16, isom.data.600[(isom.data.600$soil=="Loam"),]) +
+  geom_point(size=2.0, lwd=0.2, col="black", show_guide=TRUE) +
+  geom_point(size=1.2, lwd=0.2, aes(colour=as.factor(interaction(Sampleset,soil)))) +
+  geom_rect( mapping=aes(xmin=10, xmax=20, ymin=-10, ymax=0), color="grey", alpha=0.01) +
+  geom_rect( mapping=aes(xmin=40, xmax=50, ymin=33, ymax=36), color="grey", alpha=0.01) +
+  geom_rect( mapping=aes(xmin=30, xmax=40, ymin=34, ymax=37), color="grey", alpha=0.01) +
+  geom_abline(intercept = c(-12.5,0), slope = 0.5, alpha=0.1)+
+  geom_abline(intercept = c(-20,0), slope = 0.5, alpha=0.1)+
+  geom_abline(intercept = c(-5,0), slope = 0.5, alpha=0.1)+
+  geom_abline(intercept = c(-8,0), slope = 0.2, alpha=0.1)+
+  geom_abline(intercept = c(-14,0), slope = 0.2, alpha=0.1)+
+  geom_abline(intercept = c(-2,0), slope = 0.2, alpha=0.1)+
+  annotate("text",x=35, y=35.5, label="fungal nitrification", size=1.6, colour="black" ,face="italic") +
+  annotate("text",x=45, y=34.5, label="nitrification", size=1.6, colour="black" ,face="italic") +
+  annotate("text", x=15, y=-5, label="denitrification", size=1.6, col="black") +
+  annotate("text", x=45, y=20, label="y=0.5x+c", size=1.6, col="black") +
+  annotate("text", x=40, y=-8, label="y=0.2x+c", size=1.6, col="black") +
+  ylab("Site preference [\211]") +
+  xlab(expression(paste({delta}^18*O[soil]," [\211]"))) +
+  scale_y_continuous(limits=c(-10,40),breaks=seq(-10,40,10)) +
+  #scale_shape_manual(values=c(21,23,24,22)) +
+  scale_shape_manual(labels=c("L. terrestris","F. candida","Interaction","Control"),values=c(17,16,15,18)) +
+  scale_colour_manual("soil texture",labels=c("Loam (day 3)", "Loam (day 21)", "Sand (day 21)"),values=c("grey", "white", "black")) +
+  mytheme + theme(legend.position="none", 
+                  axis.title.y = element_text(size=8, face="plain", family="Times New Roman"))
+  
++ theme(legend.position=c(0.1,0.75), 
+                  legend.text=element_text(size=6,face="plain", family="Times New Roman"),
+                  text=element_text(lineheight=0.4),
+                  legend.margin=unit(0.2, "cm")) +
+  guides(shape = guide_legend(label.theme =element_text(family="Times New Roman", face = "italic", size=6, angle=0)))
+
+
+                  #ggsave("Figure 5.pdf", width=9, height=7, units="cm", useDingbats=FALSE)
+
+locator(1)
+
+
+with(isom.data.600, list(round(tapply(sp, list(treat, soil, Sampleset), mean),0),
+                   round(tapply(sp, list(treat, soil, Sampleset), se),0)))
+
+
+
+isom.lm1 <- lm(sp~interaction(Sampleset,soil),isom.data.600)
+summary(isom.lm1)
+
+
+
+isom.test  <-  cbind(isom.data.600$sp, isom.data.600$d18o)
+isom.mv1 <- manova(isom.test~interaction(Sampleset,soil),isom.data.600)
+summary(isom.mv1, test="Pillai")
+summary.aov(isom.mv1)
+
+isom.aov1 <- aov(sp~interaction(Sampleset,soil),isom.data.600)
+summary(isom.aov1)
+TukeyHSD(isom.aov1)
+
+isom.aov2 <- aov(d18o~interaction(Sampleset,soil),isom.data.600)
+summary(isom.aov2)
+TukeyHSD(isom.aov2)
+
+
+with(isom.data.600, by(sp, interaction(soil,Sampleset),summary))
+with(isom.data.600, by(d18o, interaction(soil,Sampleset),summary))
+
+# Reduction of n2o to n2, Rayleigh Equation
+# Rayleigh <- SP = SP0 + eSP*ln(f) // Sp = Sp0 + eSP*(1-f)
+# nach F aufgel?st:
+# f = e^((SP-SP0)/eSP) // f = 1-(SP-SP0)/eSP
+
+isom.loam.set2 <- isom.data.600[with(isom.data.600,(Sampleset==2 & soil=="Loam")),]
+sp <- mean(isom.loam.set2$sp)+1000
+sp0 <- -5+1000
+fracfac <- 1000/-5
+
+f  <-  (sp/sp0)^fracfac
+round(f,2)
+
+```
+
+
+# Quantification of N-Loss
+```{r N-Loss}
+
+# N-Loss from n2o emissions (with soil derived!)
+
+n2o.cum.mean[1:8,c(1,2,3,17)]
+
+x <- n2o.cum.mean[1:8,17]
+
+x <- x*10^-3
+
+fac.ha*x*10^-6
+
+
+# N Loss from 15N isotope sampling
+
+x2 <- with(gas15.cum2.mean[gas15.cum2.mean$day==40,], as.numeric(dinitrogen.mean)+as.numeric(nitox.gc.mean))
+
+N.loss15 <- cbind(Lt=factor(rep(c(1,0,1,0),2)), gas15.cum2.mean[gas15.cum2.mean$day==40,], N.loss=x2*10^-3)
+
+total1 <- with(N.loss15, list( tapply(N.loss, list(Lt,soil), mean),
+                        tapply(N.loss, list(Lt,soil), se)))
+total2 <- with(N.loss15, list( tapply(N.loss, Lt, mean),
+                        tapply(N.loss, Lt, se)))
+total1
+
+total2
+
+N.input = 61.5 #[mg]
+N.lost = c(1.52, 1.23,0.18) #[mg/kg]
+
+#percentage N-loss
+N.lost/N.input*100
+
+# calculated N-loss ofr 1 ha
+ha = 10000 #[m^2]
+bulk = 1200 #[kg m^-3]
+depth = 0.2 #[m]
+
+fac.ha = ha*depth*bulk
+fac.ha = 2400000 #[kg]
+fac.ha*N.lost*10^-6 #[kg/ha]
+
+```
+
+
+

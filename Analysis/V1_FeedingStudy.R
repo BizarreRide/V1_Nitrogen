@@ -5,6 +5,7 @@
 # 23.05.2015
 ###########################
 
+source("Data/GatherSource/V1_MakeLikeFile.R")
 
 # 1. Eathworm Biomass ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -24,7 +25,7 @@ rm(Exp1,Exp2,Total)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-# Data Exploration ####
+## Earthworm Biomass Data Exploration ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 # Ranges
@@ -60,10 +61,11 @@ print(ew.bm.p1, vp = vplayout(1, 1))
 print(ew.bm.p2, vp = vplayout(1, 2))
 
 rm(ew.bm.melt, binsize1, binsize2, binsize3)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
-# Analysis ####
+## Earthworm Biomass Analysis ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 shapiro.test(ew.bm$diff) # kann bei diesem Test eine Signifikanz (p < 0.05) festgestellt werden, so liegt keine Normalverteilung vor.
@@ -88,22 +90,24 @@ list(mean=apply(ew.bm[,5:6],2,mean),
 
 
 
-## 2. Collembolan Population growth ####
+# 2. Collembolan Population growth ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 # Collembolans grew very well during the experiment and 
 # reached densities hardly observed in agricultural systems.
 
-# Growth Factor ####
-col.pop.initial = 238 #Ind/MC
-col.pop.growth = col.pop$surface/238
-col.pop$growth_f = col.pop.growth
+## Growth Factor ####
+initial = 238 #Ind/MC
+# How many times more collembolans afterwards?
+col.pop$growth = col.pop$surface/initial
 
-range(col.pop.growth)
-mean(col.pop.growth); se(col.pop.growth)
-```
+mean(col.pop$growth); se(col.pop$growth);range(col.pop$growth)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# Boxplot Graphical Data Exploration
+
+## Collembolan Population Data Exploration ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 col.pop$exp <- revalue(col.pop$exp, c(Exp1="Experiment~1",Exp2="Experiment~2"))
 col.pop$treat <- revalue(col.pop$treat, c(C ="F.~candida",RC="Interaction"))
 
@@ -117,18 +121,24 @@ ggplot(col.pop, aes(x= treat, y=surface),labeller=label_parsed) +
   scale_x_discrete("Treatment", labels=expression(italic(F.~candida), Interaction)) +
   mytheme
 
+# In 3 of 4 cases Presence of Lumbricus terrestris led to increased Collembolan population growth. 
+# The only exception is the loamy soil treatment in Exp1. Here the opposite was observed.
+# Furthermore loamy soil treatments increased collembolan population growth in both experiments stronger compared to sandy soil (`r tapply(col.pop$surface, col.pop$soil,mean)`, Loam, Sand).
+# Hypothesis: Low Nitrogen content of food material leads to decreased collembolan populations in loamy soil if L. terrestris was present.
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# In 3 out of 4 cases Presence of Lumbricus terrestris led to increased Collembolan population growth. The only exception is the loamy soil treatment in Exp1. Here the opposite was observed.
-# Furthermore loamy soil treatments increased collembolan population growth in both experiments compared to sandy soil (`r tapply(col.pop$surface, col.pop$soil,mean)`, Loam, Sand).
-# Hypothesis: Low Nitrogen content of food material leads to decreased collembolan populations in loamy soil if L. terrestris is present.
 
-### Analysis of Collembolan populations
+## Collembolan populations Analysis ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 # Table of means
 with(col.pop, tapply(surface, list(soil, treat, exp), mean))
 
-# Analysis of variance
+#### Analysis of variance ####
 cp.lm1 <- lm(surface ~ treat*soil*exp, data=col.pop);cp.lm1; summary.aov(cp.lm1);summary.lm(cp.lm1)
 cp.lm2 <- lm(surface ~ treat*soil*exp-exp:treat:soil, data=col.pop);cp.lm2; summary.aov(cp.lm2);summary.lm(cp.lm2)
+cp.aov <- aov(surface ~ treat*soil*exp-exp:treat:soil, data=col.pop)
+
 
 # The coefficients table of summary.lm has as many rows, as there are parameters in the model.
 # The Intercept is the only mean value in the table. The second column contains the unreliability estimates. 
@@ -153,25 +163,14 @@ par(mfrow=c(2,2))
 par(mar=c(3,4,1.5,2), mgp=c(1.5,0.5,0))
 plot(cp.lm2)
 
-glht(cp.lm2, linfct = mcp("tukey"))
 
-#SST plot after Crawley (R-Book, p.)
-par(mfrow=c(1,1))
-with(col.pop, { plot(surface, pch=21, col="black",bg="red")
-                abline(mean(surface),0, col="blue")
-                title("SST")
-                ylab="response (surface)"
-                for (i in 1:28)
-                  lines(c(i,i), c(surface[i], mean(surface)), col="green")
-})
-TukeyHSD(cp.aov)
-# Unterschiede zw. den treatments innerhalb desselben Experiments und derselben soil texture sind ALLE nicht significant!!!  
+### Post Hoc TukeyHSD ####
 
-# More Multiple Comparisons:
 # Variant 1:
-col.pop.int <- cp.int <- with(col.pop, interaction(exp,soil,treat)) # Triple interaction factor
+cp.int <- with(col.pop, interaction(exp,soil,treat)) # Triple interaction factor
 col.aov2 <- aov(surface ~ cp.int, data=col.pop)
 HSD.test(col.aov2, "cp.int", group=TRUE, console=TRUE)
+
 #Variant 2:  
 col.tuk1 <- glht(col.aov2, linfct = mcp(cp.int = "Tukey"))
 summary(col.tuk1)          # standard display
@@ -187,9 +186,13 @@ text(cp.int, labels=cp.int, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex
 
 # Effect sizes of interactions
 col.pop.effects <- allEffects(cp.lm2)
+
 plot(col.pop.effects, "treat:soil")
 plot(col.pop.effects, "treat:exp")
 plot(col.pop.effects, "soil:exp")
+
+col.pop.effects <- allEffects(cp.lm1)
+plot(col.pop.effects, "treat:soil:exp")
 
 model.tables(cp.aov, "means", se=TRUE)
 with(col.pop, tapply(surface, list(treat,soil), mean))
@@ -201,8 +204,6 @@ with(col.pop, tapply(surface, list(treat,exp), se))
 with(col.pop, tapply(surface, list(soil,exp), mean))
 with(col.pop, tapply(surface, list(soil,exp), se))
 
-col.pop.effects <- allEffects(cp.lm1)
-plot(col.pop.effects, "treat:soil:exp")
 
 # Interessieren w?rde mich wie viel gr??er die Populationen im Schnitt in Anwesenheit von L. terrestris waren.
 # Datensatz zu differenzen zw. Interaktion und Single-Species Treatments
@@ -210,17 +211,8 @@ plot(col.pop.effects, "treat:soil:exp")
 # Bilden aller paarweise DIfferenzen und/oder nur f?r selbe Faktoren Kombination aus Exp und soil?
 # Wie subtrahiert man Standardfehler voneinander (gibt T-Test Aufschl?sse?)
 
-# Mein reduzierter Versuch:
-treat.sand.exp1 = a = 9629 - 6319
-treat.sand.exp2 = b = 18781 - 14766
-treat.loam.exp2 = c = 11246 - 4487
-cp.diff.means = c(a,b,c)
-mean(cp.diff.means); se(cp.diff.means)
-
-```
 
 ### Tukey HSD plots Two Way Interactions (optional)
-```{r More Tukey HSD, echo=FALSE, eval=FALSE}
 cp.int <- with(col.pop, interaction(treat, soil))
 aov.col1 <- aov(surface ~ cp.int, data=col.pop)
 HSD.test(aov.col1, "cp.int", group=TRUE, console=TRUE)
@@ -250,11 +242,13 @@ tuk.cld <- cld(tuk)   # letter-based display
 opar <- par(mai=c(1,1,1.5,1))
 plot(tuk.cld)
 par(opar)
-```
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 # Analysis of 15N enrichment in animal tissue
 ## 15N enrichment in L. terrestris
-```{r 15N L. terrestris}
 bs4 <- diff(range(ew.iso$atpercent))/length(ew.iso$atpercent)
 ggplot(ew.iso, aes(x=atpercent)) + 
   geom_histogram(binwidth = bs4 , fill="lightblue3", colour="black") + 
@@ -290,10 +284,8 @@ ew.iso.plot <-  qplot(soil, atpercent, colour=treat, data=ew.iso) +
         axis.title=element_text(size=rel(1.4)),
         legend.text=element_text(face="italic"))
 ew.iso.plot
-````
 
 # Analysis of 15N enrichment in L. terrestris
-```{r Analysis3}
 
 M.ew.iso <- lm(atpercent~treat*soil, data=ew.iso);anova(M.ew.iso);summary(M.ew.iso)
 M.ew.iso <- lm(atpercent~soil, data=ew.iso); anova(M.ew.iso);summary(M.ew.iso)
@@ -312,11 +304,9 @@ t.test(atpercent~soil,ew.iso, alternative="greater")
 
 with(ew.iso, list( tapply(atpercent, soil, mean),
                    tapply(atpercent, soil, se)))
-```
 L. terrestris was significantly more enriched in loamy soil, compared to sandy soil 15N in tissue was with 1.04 +/- 0.08 atom% greater than  0.75 +/- 0.08 in sandy soil.
 
 ## 15N enrichment in F.candida
-```{r 15N F. candida}
 #Histograms
 par(mfrow=c(2,1))
 hist(col.iso$atpercent)
@@ -376,9 +366,7 @@ with(col.iso, list( tapply(atpercent, soil, mean),
 mean(col.iso$atpercent)
 se(col.iso$atpercent)
 
-```
 
-```{r Figure 15N Enrichment}
 organism <- factor(rep(c("italic(L.~terrestris)", "italic(F.~candida)"), each=12), levels=c("italic(L.~terrestris)", "italic(F.~candida)"))
 ew.col.iso <- rbind(ew.iso, col.iso)
 ew.col.iso$organism <- organism
