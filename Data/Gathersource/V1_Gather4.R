@@ -58,7 +58,7 @@ gas15.cum[,3] = cumulative(gas15$nitox)
 gas15.cum[,4] = cumulative(gas15$nitox.gc)
 colnames(gas15.cum) = colnames(gas15[,c(22:24,14)])
 
-# save data on groth between two dates
+# save data on growth between two dates
 gas15.cum1 = gas15.cum
 
 # New data to sum up
@@ -73,9 +73,9 @@ for (i in 27:78)  {
 gas15.cum2 = cbind(gas15[27:104,1:13], gas15.cum2)
 
 # Dataset for Analysis
-gas15.cum = cbind(gas15[1:26,1:3],gas15[1:26,8:13], gas15.cum[53:78,])
+gas15.cum = cbind(gas15[1:26,1:3],gas15[1:26,8:13], gas15.cum2[53:78,14:17])
 gas15.cum$total.Ngas <- gas15.cum$dinitrogen + gas15.cum$nitox.gc
-gas15.cum$int.SLt <- with(gas15.cum, interaction(soil,Lt)) # Double interaction factor for TukeyHSD Tests
+gas15.cum$int.SLt <- with(gas15.cum, factor(interaction(soil,Lt), levels=c("Loam.n", "Loam.y", "Sand.n", "Sand.y"))) # Double interaction factor for TukeyHSD Tests
 gas15.cum$nitox.soil <- gas15.cum$nitox.gc - gas15.cum$nitox # Double interaction factor for TukeyHSD Tests
 
 # Averages instead of cumulated fractions:

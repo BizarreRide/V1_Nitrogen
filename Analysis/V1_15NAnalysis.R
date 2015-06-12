@@ -112,8 +112,8 @@ par(mai=c(1,1,1.1,0.2),  # mai specifies margin size in inches
     mgp=c(2,1,0),
     cex=0.8) 
 plot(nxs.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
-axis(1, at=int.SLt,labels=FALSE)
-text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+axis(1, at=gas15.cum$int.SLt,labels=FALSE)
+text(gas15.cum$int.SLt, labels=gas15.cum$int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
 
 with(gas15.cum, list( tapply(nitox.gc, list(soil,Lt), mean),
                       tapply(nitox.gc, list(soil,Lt), se)))
@@ -217,11 +217,16 @@ par(mai=c(1,1,1.1,0.2),  # mai specifies margin size in inches
     mgp=c(2,1,0),
     cex=0.8) 
 plot(dn.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
-axis(1, at=int.SLt,labels=FALSE)
-text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+axis(1, at=gas15.cum$int.SLt,labels=FALSE)
+text(gas15.cum$int.SLt, labels=gas15.cum$int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
 
 with(gas15.cum, list( tapply(dinitrogen, list(soil,Lt), mean),
                       tapply(dinitrogen, list(soil,Lt), se)))
+
+#For Table 3
+dinitrogen <- with(gas15.cum, list( Mean=round(tapply(dinitrogen, list(treat,soil), mean),1),
+                               SE=round(tapply(dinitrogen, list(treat,soil), se),1)))
+data.frame(dinitrogen)[c(1,3,2,4)];rm(dinitrogen)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -233,15 +238,16 @@ with(gas15.cum, list( tapply(dinitrogen, list(soil,Lt), mean),
 hist(gas15.cum$nitox, breaks=binsize1)
 
 # Boxplots 
-ggplot(gas15.cum, aes(x= Lt, y=nitox),labeller=label_parsed) +
-  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
-  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
-  ylab(expression(paste("Litter derived N2O"))) +
-  xlab("italic(L.~terrestris)") +
-  ggtitle(expression(paste("Product Ratio"))) +
-  facet_grid(~soil, labeller=label_parsed) + 
-  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
-  mytheme
+p1 <- ggplot(gas15.cum, aes(x= Lt, y=nitox),labeller=label_parsed) +
+        stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+        geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+        ylab(txt.nitox) +
+        xlab("italic(L.~terrestris)") +
+        ggtitle(expression(paste("Litter derived ", N[2], "O"))) +
+        facet_grid(~soil, labeller=label_parsed) + 
+        scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+        mytheme
+p1
 
 #ANOVA without transformation
 gas15.nx.aov <- aov(nitox~soil*Lt*Fc, gas15.cum); summary(gas15.nx.aov)
@@ -274,6 +280,11 @@ text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, c
 
 with(gas15.cum, list( tapply(nitox, list(Lt,soil), mean),
                       tapply(nitox, list(Lt,soil), se)))
+
+#For Table 3
+nitox <- with(gas15.cum, list( Mean=round(tapply(nitox, list(treat,soil), mean),1),
+                               SE=round(tapply(nitox, list(treat,soil), se),1)))
+data.frame(nitox)[c(1,3,2,4)];rm(nitox)
 
 boxplot(expm1(fitted(gas15.nx.aov))~gas15.cum$int.SLt)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -357,15 +368,16 @@ plot(gas15.pr.aov3)
 hist(gas15.cum$nitox.soil, breaks=binsize1)
 
 # Boxplots
-ggplot(gas15.cum, aes(x= Lt, y=nitox.soil),labeller=label_parsed) +
-  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
-  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
-  ylab(txt.nitox.soil) +
-  xlab("italic(L.~terrestris)") +
-  ggtitle("Total N2O") +
-  facet_grid(~soil, labeller=label_parsed) + 
-  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
-  mytheme
+p2 <- ggplot(gas15.cum, aes(x= Lt, y=nitox.soil),labeller=label_parsed) +
+        stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+        geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+        ylab(txt.nitox.soil) +
+        xlab("italic(L.~terrestris)") +
+        ggtitle(expression(paste("Soil derived ", N[2],"O"))) +
+        facet_grid(~soil, labeller=label_parsed) + 
+        scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+        mytheme
+p2
 
 # Anova without Transformation
 gas15.nxt.aov <- aov(nitox.soil~soil*Lt*Fc, gas15.cum); summary(gas15.nxt.aov)
@@ -393,11 +405,17 @@ par(mai=c(1,1,1.1,0.2),  # mai specifies margin size in inches
     mgp=c(2,1,0),
     cex=0.8) 
 plot(nxt.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
-axis(1, at=int.SLt,labels=FALSE)
-text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+axis(1, at=gas15.cum$int.SLt,labels=FALSE)
+text(gas15.cum$int.SLt, labels=gas15.cum$int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
 
 with(gas15.cum, list( tapply(nitox.soil, list(treat,soil), mean),
                       tapply(nitox.soil, list(treat,soil), se)))
+
+#For Table 3
+nitox.soil <- with(gas15.cum, list( Mean=round(tapply(nitox.soil, list(treat,soil), mean),1),
+                               SE=round(tapply(nitox.soil, list(treat,soil), se),1)))
+data.frame(nitox.soil)[c(1,3,2,4)];rm(nitox.soil)
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -410,15 +428,16 @@ hist(gas15.cum$nitox.pool, breaks=binsize1) # right skewed
 hist(asin(gas15.cum$nitox.pool/100)*2/pi, breaks=binsize1) # normalized
 
 # Boxplots 
-ggplot(gas15.cum, aes(x= Lt, y=nitox.pool),labeller=label_parsed) +
-  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
-  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
-  ylab(expression(paste("Fraction of ",N[2],O[Litter]))) +
-  xlab("italic(L.~terrestris)") +
-  ggtitle(expression(paste("Fraction of ",N[2],O[Litter]))) +
-  facet_grid(~soil, labeller=label_parsed) + 
-  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
-  mytheme
+p3 <- ggplot(gas15.cum, aes(x= Lt, y=nitox.pool),labeller=label_parsed) +
+        stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+        geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+        ylab(txt.pool) +
+        xlab("italic(L.~terrestris)") +
+        ggtitle(expression(paste("Fraction of ",N[2],O[Litter]))) +
+        facet_grid(~soil, labeller=label_parsed) + 
+        scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+        mytheme
+p3
 
 
 # ANOVA without Transformation
@@ -457,9 +476,81 @@ with(gas15.cum, list( tapply(nitox.pool, list(soil,Lt), mean),
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#####
 
+
+# Ratio: litter derived N2O/soil derived N2O ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+gas15.cum$lsratio <- gas15.cum$nitox/gas15.cum$nitox.gc
+
+# Histogram
+hist(gas15.cum$lsratio, breaks=binsize1) # right skewed
+hist(asin(gas15.cum$lsratio/100)*2/pi, breaks=binsize1) # not normalized
+
+# Boxplots 
+ggplot(gas15.cum, aes(x= Lt, y=lsratio),labeller=label_parsed) +
+  stat_boxplot(geom="errorbar", coef=1.5, lwd=0.2) + 
+  geom_boxplot(fill="light blue", lwd=0.2, outlier.size=0.4, outlier.shape=21) +
+  ylab(txt.pool) +
+  xlab("italic(L.~terrestris)") +
+  ggtitle(expression(paste("Fraction of ",N[2],O[Litter]))) +
+  facet_grid(~soil, labeller=label_parsed) + 
+  scale_x_discrete(expression(italic(L.~terrestris)), labels=c("absent","present")) +
+  mytheme
+
+
+
+# ANOVA without Transformation
+gas15.lsr.aov <- aov(lsratio~soil*Lt*Fc, gas15.cum); summary(gas15.lsr.aov)
+
+# ANOVA with Arcsine Transformation
+gas15.cum$lsr.trans <- asin(sqrt(gas15.cum$lsratio))*180/pi
+gas15.lsr.aov <- aov(lsratio~soil*Lt*Fc, gas15.cum); summary(gas15.lsr.aov)
+
+# Model Simplification
+gas15.lsr.aov <- update(gas15.lsr.aov,.~soil*Lt, gas15.cum); summary(gas15.lsr.aov)
+
+par(mfrow=c(2,2))
+par(mar=c(3,3,3,3))
+plot(gas15.lsr.aov)
+
+fligner.test(lsratio~interaction(soil,Lt), gas15.cum) # Heteroscedasticity!
+
+# Post Hoc Tukey Test
+gas15.lsr.aov2 <- aov(lsratio~int.SLt, data=gas15.cum)
+
+lsr.tuk <- glht(gas15.lsr.aov2, linfct = mcp(int.SLt = "Tukey"))
+summary(lsr.tuk)          # standard display
+
+lsr.tuk.cld <- cld(lsr.tuk)   # letter-based display
+par(mai=c(1,1,1.1,0.2),  # mai specifies margin size in inches
+    mfrow=c(1,1),
+    mgp=c(2,1,0),
+    cex=0.8) 
+plot(lsr.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
+axis(1, at=int.SLt,labels=FALSE)
+text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
+
+with(gas15.cum, list( tapply(lsratio, list(soil,Lt), mean),
+                      tapply(lsratio, list(soil,Lt), se)))
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+#####
 t.test(total ~ Lt , gas15.cum[gas15.cum$soil=="Sand",]) # n.s.
 t.test(nitox ~ Lt , gas15.cum[gas15.cum$soil=="Sand",]) # s.
 t.test(nitox.gc ~ Lt , gas15.cum[gas15.cum$soil=="Sand",]) # s.
 t.test(dinitrogen ~ Lt , gas15.cum[gas15.cum$soil=="Sand",]) # n.s.
+
+
+#####
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(3, 1)))
+print(p1, vp = vplayout(1, 1))
+print(p2, vp = vplayout(2, 1))
+print(p3, vp = vplayout(3, 1))
+
+
+

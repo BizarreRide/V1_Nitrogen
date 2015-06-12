@@ -57,7 +57,7 @@ gas15.se.melt    <- melt(gas15.se, id.vars = c(1:3),value.name="se")
 gas15.fig3       <- cbind(gas15.mean.melt, se=gas15.se.melt[,5])
 
 # Subset data frame
-omit <- c(levels(gas15.fig3$variable)[c(1,2,3,4,5,6,8,10,12)]) # exclude 1 to include soil derived N2O
+omit <- c(levels(gas15.fig3$variable)[c(1,2,3,4,5,6,8,10,12)]) # Include only total, product ratio and liter N2O, (cut "1" to include soil derived N2O)
 gas15.fig3.subset <- subset(gas15.fig3, !variable %in% omit)
 
 # Reorder Factor levels
@@ -78,11 +78,11 @@ trt_pal = c("firebrick3", "dodgerblue2", "darkorchid", "dimgray") # for Treatmen
 
 
 
-### Figure 3 ####
+### Figure 2 ####
 
 pd=position_dodge(0.2)
 
-Figure3 <- ggplot(gas15.fig3.subset, aes(x=day, y=mean, group=treat, shape=treat)) +
+Figure2 <- ggplot(gas15.fig3.subset, aes(x=day, y=mean, group=treat, shape=treat)) +
   facet_grid(variable~soil, scales="free", labeller=label_parsed) +
   #guides(colour=F, shape=F) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), size=0.25, width=.3, position=pd) + 
@@ -95,7 +95,7 @@ Figure3 <- ggplot(gas15.fig3.subset, aes(x=day, y=mean, group=treat, shape=treat
   xlab("Days [d]") +
   ylab(txt.PR) +
   mytheme + theme(legend.position="bottom")                     
-Figure3
+Figure2
 
 ## ggsave(Figure3, "Figure 2.pdf",  width=9, height=10.5, unit="cm", useDingbats=FALSE)   
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
