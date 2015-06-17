@@ -40,10 +40,10 @@ co2.ppm[co2.ppm<0] = 0
 # multiplication with gasflow
 co2.prod=co2.ppm*gasflow[,5:19]*10^-6*60 #[ml/h]  ### ppm beachten, zeitumrechnen
 ### umrechnen von ml auf mg
-co2.prod=co2.prod*44/22.4*1000 #[mg/h]
+co2.prod=co2.prod*44/22.4 #[mg/h]
 ### auf das Bodengewicht beziehen;  soil dry weight: 1080g
 co2.bod=co2.prod/1.080  #[mg/(kg h)
-### calculate co2-N, Anteil an molarer Masse 28/44
+### calculate co2-C, Anteil an molarer Masse 28/44
 co2=co2.bod*12/44  #[mg/(kg h)]
 co2 <- cbind(co2.index$code, co2)
 
