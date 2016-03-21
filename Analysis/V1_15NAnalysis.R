@@ -220,12 +220,12 @@ plot(dn.tuk.cld, cex=0.5, las=2, col="grey", xaxt="n")
 axis(1, at=gas15.cum$int.SLt,labels=FALSE)
 text(gas15.cum$int.SLt, labels=gas15.cum$int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, cex=0.8)
 
-with(gas15.cum, list( tapply(dinitrogen, list(soil,Lt), mean),
-                      tapply(dinitrogen, list(soil,Lt), se)))
+with(gas15.cum, list( round(tapply(dinitrogen, list(Lt,soil), mean),1),
+                      round(tapply(dinitrogen, list(Lt,soil), se),1)))
 
 #For Table 3
-dinitrogen <- with(gas15.cum, list( Mean=round(tapply(dinitrogen, list(treat,soil), mean),1),
-                               SE=round(tapply(dinitrogen, list(treat,soil), se),1)))
+dinitrogen <- with(gas15.cum, list( Mean=round(tapply(dinitrogen, list(Lt,soil), mean),1),
+                               SE=round(tapply(dinitrogen, list(Lt,soil), se),1)))
 data.frame(dinitrogen)[c(1,3,2,4)];rm(dinitrogen)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -282,8 +282,8 @@ with(gas15.cum, list( tapply(nitox, list(Lt,soil), mean),
                       tapply(nitox, list(Lt,soil), se)))
 
 #For Table 3
-nitox <- with(gas15.cum, list( Mean=round(tapply(nitox, list(treat,soil), mean),1),
-                               SE=round(tapply(nitox, list(treat,soil), se),1)))
+nitox <- with(gas15.cum, list( Mean=round(tapply(nitox, list(Lt,soil), mean),1),
+                               SE=round(tapply(nitox, list(Lt,soil), se),1)))
 data.frame(nitox)[c(1,3,2,4)];rm(nitox)
 
 boxplot(expm1(fitted(gas15.nx.aov))~gas15.cum$int.SLt)
@@ -350,6 +350,11 @@ text(gas15.cum$int.SLt, labels=gas15.cum$int.SLt, par("usr")[3], adj=c(1.2,1.2),
 with(gas15.cum, list(round(tapply(product.ratio,interaction(Lt,soil), mean),2),
                      round(tapply(product.ratio,interaction(Lt,soil), se),2)))
 
+#For Table 3
+product.ratio <- with(gas15.cum, list( Mean=round(tapply(product.ratio, list(Lt,soil), mean),2),
+                               SE=round(tapply(product.ratio, list(Lt,soil), se),2)))
+data.frame(product.ratio)[c(1,3,2,4)];rm(product.ratio)
+
 
 # ANOVA wihtout L. terrestris x Loam
 gas15.pr.aov3 <- aov(pr.trans~soil*Lt,gas15.omit) ;summary(gas15.pr.aov3)
@@ -412,8 +417,8 @@ with(gas15.cum, list( tapply(nitox.soil, list(treat,soil), mean),
                       tapply(nitox.soil, list(treat,soil), se)))
 
 #For Table 3
-nitox.soil <- with(gas15.cum, list( Mean=round(tapply(nitox.soil, list(treat,soil), mean),1),
-                               SE=round(tapply(nitox.soil, list(treat,soil), se),1)))
+nitox.soil <- with(gas15.cum, list( Mean=round(tapply(nitox.soil, list(Lt,soil), mean),1),
+                               SE=round(tapply(nitox.soil, list(Lt,soil), se),1)))
 data.frame(nitox.soil)[c(1,3,2,4)];rm(nitox.soil)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -473,6 +478,12 @@ text(int.SLt, labels=int.SLt, par("usr")[3], adj=c(1.2,1.2), xpd=TRUE, srt=45, c
 
 with(gas15.cum, list( tapply(nitox.pool, list(soil,Lt), mean),
                       tapply(nitox.pool, list(soil,Lt), se)))
+
+
+#For Table 3
+nitox.pool <- with(gas15.cum, list( Mean=round(tapply(nitox.pool, list(Lt,soil), mean),2),
+                                    SE=round(tapply(nitox.pool, list(Lt,soil), se),2)))
+data.frame(nitox.pool)[c(1,3,2,4)];rm(nitox.pool)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

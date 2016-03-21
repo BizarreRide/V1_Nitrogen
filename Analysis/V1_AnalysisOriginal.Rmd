@@ -10,7 +10,7 @@ This is the Analysis of a microcosm experiment performed at the Th?nen Institute
 #### Set working directory #
 ```{r working directory}
  #setwd("E:/Quentin_Schorpp_20.11.2014/Arbeitsprozess/V1_Analysis")
- setwd("D:/Quentin Schorpp/Arbeitsprozess/V1_Analysis")
+ setwd("D:/Quentin_Schorpp/Arbeitsprozess/V1_Analysis")
 #setwd(choose.dir())
 ```
 #### Load required packages#
@@ -572,7 +572,7 @@ n2o.PR <- n2o
 n2o.PR$max.iniloam <- apply(n2o[,-c(1,6:16)],1,max)
 n2o.PR$max.ewloam <- apply(n2o[,-c(1:5)],1,max)
 n2o.PR$max.sand <- apply(n2o[,-1],1,max)
-n2o.PR  <- cbind(n2o.index[1:56,],n2o.PR[,17:19])
+n2o.PR  <- cbind(n2o.index[1:56,],n2o.PR[,16:18])
 
 with(n2o.PR, tapply(max.sand, list(experiment, soil), mean))
 with(n2o.PR, tapply(max.sand, list(experiment, soil), se))
@@ -846,7 +846,7 @@ nc.int <- with(n2o.cum[!(n2o.cum$exp=="exp1"),], interaction(soil,Lt,Fc)) # Doub
 nc.aov3 <- update(nc.aov2,.~nc.int)
 HSD.test(nc.aov3, "nc.int", group=TRUE, console=TRUE)
 
-with(n2o.cum[!(n2o.cum$exp=="exp1"),], list(round(tapply(nc, interaction(Lt,soil), mean),0),
+with(n2o.cum[!(n2o.cum$exp=="exp2"),], list(round(tapply(nc, interaction(Lt,soil), mean),0),
                    round(tapply(nc, interaction(Lt,soil), se),0)))
 ```
 
@@ -1103,7 +1103,7 @@ with(co2.cum[!(co2.cum$exp=="exp2"),], list(round(tapply(cc, interaction(Lt,soil
                    round(tapply(cc, interaction(Lt,soil), se),0)))
 
 
-### Experiment 1
+### Experiment 2
 
 # multimodel averaging
 x <- c("Lt","Fc","exp","soil")
